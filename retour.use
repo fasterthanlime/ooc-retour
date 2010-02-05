@@ -1,0 +1,4 @@
+Name: Retour
+Version: head
+Description: ooc conversion of Recast and Detour (http://code.google.com/p/recastnavigation/)
+SourcePath: .
