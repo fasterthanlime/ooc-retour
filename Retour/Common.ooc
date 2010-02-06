@@ -3,7 +3,7 @@ RCConstants: class {
 	PI: static const Double = 3.1415926535897932384626
 }
 
-rcAllocArray: func<T>(type: T, count: Int) -> T* {
+rcAllocArray: func (T: Class, count: Int) -> Pointer {
 	return gc_malloc(T size * count)
 }
 
