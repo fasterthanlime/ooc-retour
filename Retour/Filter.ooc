@@ -1,12 +1,15 @@
+use retour
+import Retour/[Retour, Timer]
+
 // TODO: Missuses ledge flag, must be called before rcFilterLedgeSpans!
-rcFilterLowHangingWalkableObstacles: func(walkableClimb: Int, solid: RCHeightfield&) {
+rcFilterLowHangingWalkableObstacles: func(walkableClimb: Int, solid: RCHeightfield@) {
 	w := solid width
 	h := solid height
 	
 	for (y: Int in 0..h) {
 		for (x: Int in 0..w) {
 			ps: RCSpan* = 0
-			for (s: RCSpan* = solid spans[x + y*w]; s; ps = s, s = (s next)) {
+			for (s: RCSpan* = solid spans[x + y*w]; s; s = (s next)) {
 				walkable: Bool = (s flags & RC_WALKABLE) != 0
 				previousWalkable: Bool = ps && (ps flags & RC_WALKABLE) != 0
 				// If current span is not walkable, but there is walkable
@@ -17,18 +20,20 @@ rcFilterLowHangingWalkableObstacles: func(walkableClimb: Int, solid: RCHeightfie
 					if (rcAbs((s smax as Int) - (ps smax as Int)) <= walkableClimb)
 						s flags |= RC_LEDGE
 				}
+				ps = s
 			}
 			// Transfer "fake ledges" to walkables.
-			for (s: RCSpan* = solid spans[x + y*w]; s; ps = s, s = s next) {
+			for (s: RCSpan* = solid spans[x + y*w]; s; s = s next) {
 				if (s flags & RC_LEDGE)
 					s flags |= RC_WALKABLE
 				s flags &= ~RC_LEDGE
+				ps = s
 			}
 		}
 	}
 }
 	
-rcFilterLedgeSpans: func(walkableHeight: Int, alkableClimb: Int, solid: RCHeightfield&) {
+rcFilterLedgeSpans: func(walkableHeight: Int, alkableClimb: Int, solid: RCHeightfield@) {
 	startTime := rcGetPerformanceTimer()
 	
 	w := solid width
@@ -107,7 +112,7 @@ rcFilterLedgeSpans: func(walkableHeight: Int, alkableClimb: Int, solid: RCHeight
 		rcGetBuildTimes() filterBorder += rcGetDeltaTimeUsec(startTime, endTime)
 }	
 
-rcFilterWalkableLowHeightSpans: func(walkableHeight: Int, solid: RCHeightfield&) {
+rcFilterWalkableLowHeightSpans: func(walkableHeight: Int, solid: RCHeightfield@) {
 	startTime := rcGetPerformanceTimer()
 	
 	w := solid width

@@ -20,7 +20,8 @@ RCLog: class {
         va_start(list, this)
         vsnprintf(output, length, format, list)
         va_end(list)
-		m_messages[m_messageCount++] = RCLogMessage new(category, output)
+		m_messages[m_messageCount] = RCLogMessage new(category, output)
+		m_messageCount += 1
 	}
 	
 	clear: inline func() {
@@ -30,15 +31,15 @@ RCLog: class {
 	getMessageCount: inline func() -> Int {
 		return m_messageCount
 	}
-	getMessageType: inline func(int i) -> Int {
+	getMessageType: inline func(i: Int) -> Int {
 		return m_messages[i] type
 	}
-	getMessageText: inline func(int i) -> String {
+	getMessageText: inline func(i: Int) -> String {
 		return m_messages[i] message
 	}
-
+	
 	MAX_MESSAGES: static const Int = 1000
-	m_messages: String[MAX_MESSAGES]
+	m_messages: RCLogMessage[RcLog MAX_MESSAGES]
 	m_messageCount: Int
 }
 
@@ -83,11 +84,11 @@ rcGetLog: func() -> RCLog {
 	return g_log
 }
 
-rcSetBuildTimes(btimes: RCBuildTimes) {
+rcSetBuildTimes: func(btimes: RCBuildTimes) {
 	g_btimes = btimes
 }
 
-rcGetBuildTimes() -> RCBuildTimes {
+rcGetBuildTimes: func() -> RCBuildTimes {
 	return g_btimes
 }
 

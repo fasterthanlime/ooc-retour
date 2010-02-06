@@ -1,3 +1,6 @@
+use retour
+import Retour/[Retour, Timer]
+
 RCEdge: class {
 	vert: UShort[2]
 	polyEdge: UShort[2]
@@ -23,8 +26,8 @@ buildMeshAdjacency: static func(polys: UShort*, npolys, nverts, vertsPerPoly: In
 		firstEdge[i] = RC_MESH_NULL_IDX
 	
 	for (i: Int in 0..npolys) {
-		t: UShort* = &polys[i*vertsPerPoly*2]
-		for (j: Int in 0. vertsPerPoly) {
+		t: UShort* = polys[i*vertsPerPoly*2]&
+		for (j: Int in 0..vertsPerPoly) {
 			v0: UShort = t[j]
 			v1: UShort = (j+1 >= vertsPerPoly || t[j+1] == RC_MESH_NULL_IDX) ? t[0] : t[j+1]
 			if (v0 < v1) {
@@ -38,14 +41,14 @@ buildMeshAdjacency: static func(polys: UShort*, npolys, nverts, vertsPerPoly: In
 				// Insert edge
 				nextEdge[edgeCount] = firstEdge[v0]
 				firstEdge[v0] = edgeCount
-				edgeCount++
+				edgeCount+=1
 			}
 		}
 	}
 	
 	for (i: Int in 0..npolys) {
-		t: UShort* = &polys[i*vertsPerPoly*2]
-		for (j: Int in 0. vertsPerPoly) {
+		t: UShort* = polys[i*vertsPerPoly*2]&
+		for (j: Int in 0..vertsPerPoly) {
 			v0:UShort = t[j]
 			v1: UShort = (j+1 >= vertsPerPoly || t[j+1] == RC_MESH_NULL_IDX) ? t[0] : t[j+1]
 			if (v0 > v1) {
@@ -63,10 +66,10 @@ buildMeshAdjacency: static func(polys: UShort*, npolys, nverts, vertsPerPoly: In
 	
 	// Store adjacency
 	for (i: Int in 0..edgeCount) {
-		e: RCEdge& = edges[i]
+		e: RCEdge = edges[i]
 		if (e poly[0] != e poly[1]) {
-			p0: UShort* = &polys[e poly[0]*vertsPerPoly*2]
-			p1: UShort* = &polys[e poly[1]*vertsPerPoly*2]
+			p0: UShort* = polys[e poly[0]*vertsPerPoly*2]&
+			p1: UShort* = polys[e poly[1]*vertsPerPoly*2]&
 			p0[vertsPerPoly + e polyEdge[0]] = e poly[1]
 			p1[vertsPerPoly + e polyEdge[1]] = e poly[0]
 		}
@@ -88,20 +91,20 @@ computeVertexHash: inline func(x, y, z: Int) -> Int {
 	return (n & (VERTEX_BUCKET_COUNT-1)) as Int
 }
 
-addVertex: static func(x, y, z: UShort, verts: UShort*, firstVert, nextVert: Int*, nv: Int&) -> Int {
+addVertex: static func(x, y, z: UShort, verts: UShort*, firstVert, nextVert: Int*, nv: Int@) -> Int {
 	bucket := computeVertexHash(x, 0, z)
 	i := firstVert[bucket]
 	
 	while (i != -1) {
-		v: UShort* = &verts[i*3]
+		v: UShort* = verts[i*3]&
 		if (v[0] == x && (rcAbs(v[1] - y) <= 2) && v[2] == z)
 			return i
 		i = nextVert[i] // next
 	}
 	
 	// Could not find, create new.
-	i = nv; nv++
-	v: UShort* = &verts[i*3]
+	i = nv; nv+=1
+	v: UShort* = verts[i*3]&
 	v[0] = x
 	v[1] = y
 	v[2] = z
@@ -111,8 +114,13 @@ addVertex: static func(x, y, z: UShort, verts: UShort*, firstVert, nextVert: Int
 	return i
 }
 
-prev: inline func(i, n: Int) -> Int { return i-1 >= 0 ? i-1 : n-1; }
-next: inline func(i, n: Int) -> Int { return i+1 < n ? i+1 : 0; }
+prev: inline func(i, n: Int) -> Int {
+	return i-1 >= 0 ? i-1 : n-1
+}
+
+next: inline func(i, n: Int) -> Int {
+	return i+1 < n ? i+1 : 0
+}
 
 area2: inline func(a, b, c: Int*) -> Int{
 	return (b[0] - a[0]) * (c[2] - a[2]) - (c[0] - a[0]) * (b[2] - a[2])
@@ -182,20 +190,19 @@ vequal: static func(a, b: Int*) -> Bool {
 // Returns T iff (v_i, v_j) is a proper internal *or* external
 // diagonal of P, *ignoring edges incident to v_i and v_j*.
 diagonalie: static func(i, j, n: Int, verts, indices: Int*) -> Bool {
-	d0: Int* = &verts[(indices[i] & 0x0fffffff) * 4]
-	d1: Int* = &verts[(indices[j] & 0x0fffffff) * 4]
+	d0: Int* = verts[(indices[i] & 0x0fffffff) * 4]&
+	d1: Int* = verts[(indices[j] & 0x0fffffff) * 4]&
 	
 	// For each edge (k,k+1) of P
 	for (k: Int in 0..n) {
 		k1 := next(k, n)
 		// Skip edges incident to i or j
 		if (!((k == i) || (k1 == i) || (k == j) || (k1 == j))) {
-			p0: Int* = &verts[(indices[k] & 0x0fffffff) * 4]
-			p1: Int* = &verts[(indices[k1] & 0x0fffffff) * 4]
+			p0: Int* = verts[(indices[k] & 0x0fffffff) * 4]&
+			p1: Int* = verts[(indices[k1] & 0x0fffffff) * 4]&
 			
 			if (vequal(d0, p0) || vequal(d1, p0) || vequal(d0, p1) || vequal(d1, p1))
 				continue
-			
 			if (intersect(d0, d1, p0, p1))
 				return false
 		}
@@ -206,10 +213,10 @@ diagonalie: static func(i, j, n: Int, verts, indices: Int*) -> Bool {
 // Returns true iff the diagonal (i,j) is strictly internal to the 
 // polygon P in the neighborhood of the i endpoint.
 inCone: static func(i, j, n: Int, verts, indices: Int*) -> Bool {
-	pi: Int* = &verts[(indices[i] & 0x0fffffff) * 4]
-	pj: Int* = &verts[(indices[j] & 0x0fffffff) * 4]
-	pi1: Int* = &verts[(indices[next(i, n)] & 0x0fffffff) * 4]
-	pin1: Int* = &verts[(indices[prev(i, n)] & 0x0fffffff) * 4]
+	pi: Int* = verts[(indices[i] & 0x0fffffff) * 4]&
+	pj: Int* = verts[(indices[j] & 0x0fffffff) * 4]&
+	pi1: Int* = verts[(indices[next(i, n)] & 0x0fffffff) * 4]&
+	pin1: Int* = verts[(indices[prev(i, n)] & 0x0fffffff) * 4]&
 	
 	// If P[i] is a convex vertex [ i+1 left or on (i-1,i) ].
 	if (leftOn(pin1, pi, pi1))
@@ -243,8 +250,8 @@ triangulate: func(n: Int, verts, indices, tris: Int*) -> Int{
 		for (i: Int in 0..n) {
 			i1 := next(i, n)
 			if (indices[i1] & 0x80000000) {
-				p0: Int* = &verts[(indices[i] & 0x0fffffff) * 4]
-				p2: Int* = &verts[(indices[next(i1, n)] & 0x0fffffff) * 4]
+				p0: Int* = verts[(indices[i] & 0x0fffffff) * 4]&
+				p2: Int* = verts[(indices[next(i1, n)] & 0x0fffffff) * 4]&
 				
 				dx := p2[0] - p0[0]
 				dy := p2[2] - p0[2]
@@ -274,13 +281,13 @@ triangulate: func(n: Int, verts, indices, tris: Int*) -> Int{
 		i1 := next(i, n)
 		i2 := next(i1, n)
 		
-		*dst++ = indices[i] & 0x0fffffff
-		*dst++ = indices[i1] & 0x0fffffff
-		*dst++ = indices[i2] & 0x0fffffff
-		ntris++
+		dst@ = indices[i] & 0x0fffffff; dst+=1
+		dst@ = indices[i1] & 0x0fffffff; dst+=1
+		dst@ = indices[i2] & 0x0fffffff; dst+=1
+		ntris+=1
 		
 		// Removes P[i1] by copying P[i+1]...P[n-1] left one index.
-		n--
+		n-=1
 		for (k: Int in i1..n)
 			indices[k] = indices[k+1]
 		
@@ -299,16 +306,16 @@ triangulate: func(n: Int, verts, indices, tris: Int*) -> Int{
 	}
 	
 	// Append the remaining triangle.
-	*dst++ = indices[0] & 0x0fffffff
-	*dst++ = indices[1] & 0x0fffffff
-	*dst++ = indices[2] & 0x0fffffff
-	ntris++
+	dst = indices[0] & 0x0fffffff; dst+=1
+	dst@ = indices[1] & 0x0fffffff; dst+=1
+	dst@ = indices[2] & 0x0fffffff; dst+=1
+	ntris+=1
 	
 	return ntris
 }
 
 countPolyVerts: static func(p: UShort*, nvp: Int) -> Int {
-	for (int i = 0; i < nvp; ++i)
+	for (i: Int in 0..nvp)
 		if (p[i] == RC_MESH_NULL_IDX)
 			return i
 	return nvp
@@ -319,7 +326,7 @@ uleft: inline func(a, b, c: UShort*) -> Bool {
 		   ((c[0] as Int) - (a[0] as Int)) * ((b[2] as Int) - (a[2] as Int)) < 0
 }
 
-getPolyMergeValue: static func(pa, pb, verts: UShort*, ea, eb: Int&, nvp: Int) -> Int {
+getPolyMergeValue: static func(pa, pb, verts: UShort*, ea, eb: Int@, nvp: Int) -> Int {
 	na := countPolyVerts(pa, nvp)
 	nb := countPolyVerts(pb, nvp)
 	
@@ -359,13 +366,13 @@ getPolyMergeValue: static func(pa, pb, verts: UShort*, ea, eb: Int&, nvp: Int) -
 	va = pa[(ea+na-1) % na]
 	vb = pa[ea]
 	vc = pb[(eb+2) % nb]
-	if (!uleft(&verts[va*3], &verts[vb*3], &verts[vc*3]))
+	if (!uleft(verts[va*3]&, verts[vb*3]&, verts[vc*3]&))
 		return -1
 	
 	va = pb[(eb+nb-1) % nb]
 	vb = pb[eb]
 	vc = pa[(ea+2) % na]
-	if (!uleft(&verts[va*3], &verts[vb*3], &verts[vc*3]))
+	if (!uleft(verts[va*3]&, verts[vb*3]&, verts[vc*3]&))
 		return -1
 	
 	va = pa[ea]
@@ -386,39 +393,39 @@ mergePolys: static func(pa, pb: UShort*, ea, eb: Int, tmp: UShort*, nvp: Int) {
 	n := 0
 	// Add pa
 	for (i: Int in 0..(na-1))
-		tmp[n++] = pa[(ea+1+i) % na]
+		tmp[n] = pa[(ea+1+i) % na]; n+=1
 	// Add pb
 	for (i: Int in 0..(nb-1))
-		tmp[n++] = pb[(eb+1+i) % nb]
+		tmp[n] = pb[(eb+1+i) % nb]; n+=1
 	
 	memcpy(pa, tmp, sizeof(UShort)*nvp)
 }
 
-pushFront: static func(v: Int, arr: Int*, an: Int&) {
-	an++
-	for (int i = an-1; i > 0; --i)
+pushFront: static func(v: Int, arr: Int*, an: Int@) {
+	an+=1
+	for (i := an-1; i > 0; i-=1)
 		arr[i] = arr[i-1]
 	arr[0] = v
 }
 
-pushBack: static func(v: Int, arr: Int*, an: Int&) {
+pushBack: static func(v: Int, arr: Int*, an: Int@) {
 	arr[an] = v
-	an++
+	an+=1
 }
 
-removeVertex: static func(RCPolyMesh& mesh, UShort rem, int maxTris) -> Bool {
+removeVertex: static func(mesh: RCPolyMesh@, rem: UShort, maxTris: Int) -> Bool {
 	nvp: static Int = mesh nvp
 	
 	// Count number of polygons to remove.
 	nrem := 0
 	for (i: Int in 0..mesh npolys) {
-		p: UShort* = &mesh polys[i*nvp*2]
-		for (int j = 0; j < nvp; ++j)
-			if (p[j] == rem) { nrem++; break; }
+		p: UShort* = mesh polys[i*nvp*2]&
+		for (j: Int in 0..nvp)
+			if (p[j] == rem) { nrem+=1; break; }
 	}
 	
 	nedges := 0
-	edges = rcAllocArray(Int, nrem*nvp*4)
+	edges := Array<Int> new(nrem*nvp*4)
 	if (!edges) {
 		if (rcGetLog())
 			rcGetLog() log(RCLogCategory RC_LOG_WARNING, "removeVertex: Out of memory 'edges' (%d).", nrem*nvp*4)
@@ -426,7 +433,7 @@ removeVertex: static func(RCPolyMesh& mesh, UShort rem, int maxTris) -> Bool {
 	}
 
 	nhole := 0
-	hole = rcAllocArray(Int, nrem*nvp)
+	hole := Array<Int> new(nrem*nvp)
 	if (!hole) {
 		if (rcGetLog())
 			rcGetLog() log(RCLogCategory RC_LOG_WARNING, "removeVertex: Out of memory 'hole' (%d).", nrem*nvp)
@@ -434,7 +441,7 @@ removeVertex: static func(RCPolyMesh& mesh, UShort rem, int maxTris) -> Bool {
 	}
 	
 	nhreg := 0
-	hreg = rcAllocArray(Int, nrem*nvp)
+	hreg := Array<Int> new(nrem*nvp)
 	if (!hreg) {
 		if (rcGetLog())
 			rcGetLog() log(RCLogCategory RC_LOG_WARNING, "removeVertex: Out of memory 'hreg' (%d).", nrem*nvp)
@@ -442,7 +449,7 @@ removeVertex: static func(RCPolyMesh& mesh, UShort rem, int maxTris) -> Bool {
 	}
 
 	nharea := 0
-	harea = rcAllocArray(Int, nrem*nvp)
+	harea := Array<Int> new(nrem*nvp)
 	if (!harea) {
 		if (rcGetLog())
 			rcGetLog() log(RCLogCategory RC_LOG_WARNING, "removeVertex: Out of memory 'harea' (%d).", nrem*nvp)
@@ -450,7 +457,7 @@ removeVertex: static func(RCPolyMesh& mesh, UShort rem, int maxTris) -> Bool {
 	}
 	
 	for (i: Int in 0..(mesh npolys)) {
-		p: UShort* = &mesh polys[i*nvp*2]
+		p: UShort* = mesh polys[i*nvp*2]&
 		nv := countPolyVerts(p, nvp)
 		hasRem := false
 		for (j: Int in 0..nv)
@@ -460,22 +467,22 @@ removeVertex: static func(RCPolyMesh& mesh, UShort rem, int maxTris) -> Bool {
 			k := nv-1
 			for (j: Int in 0..nv) {
 				if (p[j] != rem && p[k] != rem) {
-					e: Int* = &edges[nedges*4]
+					e: Int* = edges[nedges*4]&
 					e[0] = p[k]
 					e[1] = p[j]
 					e[2] = mesh regs[i]
 					e[3] = mesh areas[i]
-					nedges++
+					nedges+=1
 				}
 				k = j
 			}
 			// Remove the polygon.
-			p2: UShort* = &mesh polys[(mesh npolys-1)*nvp*2]
+			p2: UShort* = mesh polys[(mesh npolys-1)*nvp*2]&
 			memcpy(p, p2, sizeof(UShort)*nvp)
 			mesh regs[i] = mesh regs[mesh npolys-1]
 			mesh areas[i] = mesh areas[mesh npolys-1]
-			mesh npolys--
-			--i
+			mesh npolys-=1
+			i-=1
 		}
 	}
 	
@@ -485,18 +492,18 @@ removeVertex: static func(RCPolyMesh& mesh, UShort rem, int maxTris) -> Bool {
 		mesh verts[i*3+1] = mesh verts[(i+1)*3+1]
 		mesh verts[i*3+2] = mesh verts[(i+1)*3+2]
 	}
-	nverts--
+	nverts-=1
 	
 	// Adjust indices to match the removed vertex layout.
 	for (i: Int in 0..(mesh npolys)) {
-		p: UShort* = &mesh polys[i*nvp*2]
+		p: UShort* = mesh polys[i*nvp*2]&
 		int nv = countPolyVerts(p, nvp)
-		for (int j = 0; j < nv; ++j)
-			if (p[j] > rem) p[j]--
+		for (j: Int in 0..nv)
+			if (p[j] > rem) p[j]-=1
 	}
 	for (i: Int in 0..nedges) {
-		if (edges[i*4+0] > rem) edges[i*4+0]--
-		if (edges[i*4+1] > rem) edges[i*4+1]--
+		if (edges[i*4+0] > rem) edges[i*4+0] -= 1
+		if (edges[i*4+1] > rem) edges[i*4+1] -= 1
 	}
 
 	if (nedges == 0)
@@ -507,10 +514,10 @@ removeVertex: static func(RCPolyMesh& mesh, UShort rem, int maxTris) -> Bool {
 	hole[nhole] = edges[0]
 	hreg[nhole] = edges[2]
 	harea[nhole] = edges[3]
-	nhole++
+	nhole+=1
 	
 	while (nedges) {
-		match := false
+		smatch := false
 		for (i: Int in 0..nedges) {
 			ea: Int = edges[i*4+0]
 			eb: Int = edges[i*4+1]
@@ -536,12 +543,12 @@ removeVertex: static func(RCPolyMesh& mesh, UShort rem, int maxTris) -> Bool {
 				edges[i*4+1] = edges[(nedges-1)*4+1]
 				edges[i*4+2] = edges[(nedges-1)*4+2]
 				edges[i*4+3] = edges[(nedges-1)*4+3]
-				--nedges
-				match = true
-				--i
+				nedges-=1
+				smatch = true
+				i-=1
 			}
 		}
-		if (!match)
+		if (!smatch)
 			break
 	}
 	
@@ -577,7 +584,7 @@ removeVertex: static func(RCPolyMesh& mesh, UShort rem, int maxTris) -> Bool {
 	}
 
 	// Triangulate the hole.
-	ntris := triangulate(nhole, &tverts[0], &thole[0], tris)
+	ntris := triangulate(nhole, tverts[0]&, thole[0]&, tris)
 	if (ntris < 0) {
 		ntris = -ntris
 		if (rcGetLog())
@@ -604,20 +611,20 @@ removeVertex: static func(RCPolyMesh& mesh, UShort rem, int maxTris) -> Bool {
 		return false
 	}
 	
-	tmpPoly: UShort* = &polys[ntris*nvp]
+	tmpPoly: UShort* = polys[ntris*nvp]&
 	
 	// Build initial polygons.
-	int npolys = 0
+	npolys: Int = 0
 	memset(polys, 0xff, ntris*nvp*sizeof(UShort))
 	for (j: Int in 0..ntris) {
-		t: Int* = &tris[j*3]
+		t: Int* = tris[j*3]&
 		if (t[0] != t[1] && t[0] != t[2] && t[1] != t[2]) {
 			polys[npolys*nvp+0] = hole[t[0]] as UShort
 			polys[npolys*nvp+1] = hole[t[1]] as UShort
 			polys[npolys*nvp+2] = hole[t[2]] as UShort
 			pregs[npolys] = hreg[t[0]] as UShort
 			pareas[npolys] = harea[t[0]] as UInt8
-			npolys++
+			npolys+=1
 		}
 	}
 	if (!npolys)
@@ -631,9 +638,9 @@ removeVertex: static func(RCPolyMesh& mesh, UShort rem, int maxTris) -> Bool {
 			bestPa, bestPb, bestEa, bestEb: Int
 			
 			for (j: Int in 0..(npolys-1)) {
-				pj: UShort* = &polys[j*nvp]
-				for (int k = j+1; k < npolys; ++k) {
-					pk: UShort* = &polys[k*nvp]
+				pj: UShort* = polys[j*nvp]&
+				for (k: Int in (j+1)..npolys) {
+					pk: UShort* = polys[k*nvp]&
 					ea, eb: Int
 					v := getPolyMergeValue(pj, pk, mesh verts, ea, eb, nvp)
 					if (v > bestMergeVal) {
@@ -648,13 +655,13 @@ removeVertex: static func(RCPolyMesh& mesh, UShort rem, int maxTris) -> Bool {
 			
 			if (bestMergeVal > 0) {
 				// Found best, merge.
-				pa: UShort* = &polys[bestPa*nvp]
-				pb: UShort* = &polys[bestPb*nvp]
+				pa: UShort* = polys[bestPa*nvp]&
+				pb: UShort* = polys[bestPb*nvp]&
 				mergePolys(pa, pb, bestEa, bestEb, tmpPoly, nvp)
-				memcpy(pb, &polys[(npolys-1)*nvp], sizeof(UShort)*nvp)
+				memcpy(pb, polys[(npolys-1)*nvp]&, sizeof(UShort)*nvp)
 				pregs[bestPb] = pregs[npolys-1]
 				pareas[bestPb] = pareas[npolys-1]
-				npolys--
+				npolys-=1
 			} else {
 				// Could not merge any polygons, stop.
 				break
@@ -665,13 +672,13 @@ removeVertex: static func(RCPolyMesh& mesh, UShort rem, int maxTris) -> Bool {
 	// Store polygons.
 	for (i: Int in 0..npolys) {
 		if (mesh npolys >= maxTris) break
-		p: UShort* = &mesh polys[(mesh npolys)*nvp*2]
+		p: UShort* = mesh polys[(mesh npolys)*nvp*2]&
 		memset(p, 0xff, sizeof(UShort)*nvp*2)
 		for (j: Int in 0..nvp)
 			p[j] = polys[i*nvp+j]
 		mesh regs[mesh npolys] = pregs[i]
 		mesh areas[mesh npolys] = pareas[i]
-		mesh npolys++
+		mesh npolys+=1
 		if (mesh npolys > maxTris) {
 			if (rcGetLog())
 				rcGetLog() log(RC_LOG_ERROR, "removeVertex: Too many polygons %d (max:%d).", mesh npolys, maxTris)
@@ -681,8 +688,7 @@ removeVertex: static func(RCPolyMesh& mesh, UShort rem, int maxTris) -> Bool {
 	return true
 }
 
-
-rcBuildPolyMesh: func(cset: RCContourSet&, nvp: Int, mesh: RCPolyMesh) -> Bool {
+rcBuildPolyMesh: func(cset: RCContourSet@, nvp: Int, mesh: RCPolyMesh) -> Bool {
 	startTime := rcGetPerformanceTimer()
 	
 	vcopy(mesh bmin, cset bmin)
@@ -696,7 +702,7 @@ rcBuildPolyMesh: func(cset: RCContourSet&, nvp: Int, mesh: RCPolyMesh) -> Bool {
 	for (i: Int in 0..(cset nconts)) {
 		// Skip null contours.
 		if (cset conts[i] nverts < 3) continue
-		maxVertices += cset.conts[i] nverts
+		maxVertices += cset conts[i] nverts
 		maxTris += cset conts[i] nverts - 2
 		maxVertsPerCont = rcMax(maxVertsPerCont, cset conts[i] nverts)
 	}
@@ -707,7 +713,7 @@ rcBuildPolyMesh: func(cset: RCContourSet&, nvp: Int, mesh: RCPolyMesh) -> Bool {
 		return false
 	}
 	
-	vflags := rcAllocArray(UInt8, maxVertices)
+	vflags := Array<UInt8> new(maxVertices)
 	if (!vflags) {
 		if (rcGetLog())
 			rcGetLog() log(RCLogCategory RC_LOG_ERROR, "rcBuildPolyMesh: Out of memory 'mesh verts' (%d).", maxVertices)
@@ -715,28 +721,28 @@ rcBuildPolyMesh: func(cset: RCContourSet&, nvp: Int, mesh: RCPolyMesh) -> Bool {
 	}
 	memset(vflags, 0, maxVertices)
 	
-	mesh verts = rcAllocArray(UShort, maxVertices*3)
+	mesh verts = Array<UShort> new(maxVertices*3)
 	if (!mesh verts) {
 		if (rcGetLog())
 			rcGetLog() log(RCLogCategory RC_LOG_ERROR, "rcBuildPolyMesh: Out of memory 'mesh verts' (%d).", maxVertices)
 		return false
 	}
 	
-	mesh polys = rcAllocArray(UShort, maxTris*nvp*2*2)
+	mesh polys = Array<UShort> new(maxTris*nvp*2*2)
 	if (!mesh polys) {
 		if (rcGetLog())
 			rcGetLog() log(RCLogCategory RC_LOG_ERROR, "rcBuildPolyMesh: Out of memory 'mesh polys' (%d).", maxTris*nvp*2)
 		return false
 	}
 	
-	mesh regs = rcAllocArray(UShort, maxTris)
+	mesh regs = Array<UShort> new(maxTris)
 	if (!mesh regs) {
 		if (rcGetLog())
 			rcGetLog() log(RCLogCategory RC_LOG_ERROR, "rcBuildPolyMesh: Out of memory 'mesh.regs' (%d).", maxTris)
 		return false
 	}
 	
-	mesh areas = rcAllocArray(UInt8, maxTris)
+	mesh areas = Array<UInt8> new(maxTris)
 	if (!mesh areas) {
 		if (rcGetLog())
 			rcGetLog() log(RCLogCategory RC_LOG_ERROR, "rcBuildPolyMesh: Out of memory 'mesh.areas' (%d).", maxTris)
@@ -752,7 +758,7 @@ rcBuildPolyMesh: func(cset: RCContourSet&, nvp: Int, mesh: RCPolyMesh) -> Bool {
 	memset(mesh regs, 0, sizeof(UShort)*maxTris)
 	memset(mesh areas, 0, sizeof(UInt8)*maxTris)
 	
-	nextVert := rcAllocArray(Int, maxVertices)
+	nextVert := Array<Int> new(maxVertices)
 	if (!nextVert) {
 		if (rcGetLog())
 			rcGetLog() log(RCLogCategory RC_LOG_ERROR, "rcBuildPolyMesh: Out of memory 'nextVert' (%d).", maxVertices)
@@ -760,41 +766,39 @@ rcBuildPolyMesh: func(cset: RCContourSet&, nvp: Int, mesh: RCPolyMesh) -> Bool {
 	}
 	memset(nextVert, 0, sizeof(Int)*maxVertices)
 	
-	firstVert := rcAllocArray(Int, VERTEX_BUCKET_COUNT)
+	firstVert := Array<Int> new(VERTEX_BUCKET_COUNT)
 	if (!firstVert) {
 		if (rcGetLog())
 			rcGetLog() log(RCLogCategory RC_LOG_ERROR, "rcBuildPolyMesh: Out of memory 'firstVert' (%d).", VERTEX_BUCKET_COUNT)
 		return false
 	}
-	for (int i = 0; i < VERTEX_BUCKET_COUNT; ++i)
+	for (i: Int in 0..VERTEX_BUCKET_COUNT)
 		firstVert[i] = -1
 	
-	indices := rcAllocArray(Int, maxVertsPerCont)
+	indices := Array<Int> new(maxVertsPerCont)
 	if (!indices) {
 		if (rcGetLog())
 			rcGetLog() log(RCLogCategory RC_LOG_ERROR, "rcBuildPolyMesh: Out of memory 'indices' (%d).", maxVertsPerCont)
 		return false
 	}
 	
-	tris := rcAllocArray(Int, maxVertsPerCont*3)
+	tris := Array<Int> new(maxVertsPerCont*3)
 	if (!tris) {
 		if (rcGetLog())
 			rcGetLog() log(RCLogCategory RC_LOG_ERROR, "rcBuildPolyMesh: Out of memory 'tris' (%d).", maxVertsPerCont*3)
 		return false
 	}
 	
-	// This uses (maxVertsPerCont+1)*nvp, whereas the error logging uses maxVertsPerCont+*nvp..
-	// not sure why.
-	polys := rcAllocArray(UShort, (maxVertsPerCont+1)*nvp) 
+	polys := Array<UShort> new((maxVertsPerCont+1)*nvp) 
 	if (!polys) {
 		if (rcGetLog())
-			rcGetLog() log(RCLogCategory RC_LOG_ERROR, "rcBuildPolyMesh: Out of memory 'polys' (%d).", maxVertsPerCont*nvp)
+			rcGetLog() log(RCLogCategory RC_LOG_ERROR, "rcBuildPolyMesh: Out of memory 'polys' (%d).", (maxVertsPerCont+1)*nvp)
 		return false
 	}
-	tmpPoly: UShort* = &polys[maxVertsPerCont*nvp]
+	tmpPoly: UShort* = polys[maxVertsPerCont*nvp]&
 	
 	for (i: Int in 0..(cset nconts)) {
-		cont: RCContour& = cset conts[i]
+		cont: RCContour = cset conts[i]&
 		
 		// Skip null contours.
 		if (cont nverts < 3)
@@ -804,12 +808,12 @@ rcBuildPolyMesh: func(cset: RCContourSet&, nvp: Int, mesh: RCPolyMesh) -> Bool {
 		for (j: Int in 0..(cont nverts))
 			indices[j] = j
 			
-		ntris := triangulate(cont nverts, cont verts, &indices[0], &tris[0])
+		ntris := triangulate(cont nverts, cont verts, indices[0]&, tris[0]&)
 		if (ntris <= 0) {
 			// Bad triangulation, should not happen.
 			/*for (int k = 0; k < cont.nverts; ++k)
 			{
-				int* v = &cont verts[k*4]
+				int* v = cont verts[k*4]&
 				printf("\t\t%d,%d,%d,%d,\n", v[0], v[1], v[2], v[3])
 				if (nBadPos < 100)
 				{
@@ -824,7 +828,7 @@ rcBuildPolyMesh: func(cset: RCContourSet&, nvp: Int, mesh: RCPolyMesh) -> Bool {
 		
 		// Add and merge vertices.
 		for (j: Int in 0..(cont nverts)) {
-			v: Int* = &(cont verts[j*4])
+			v: Int* = cont verts[j*4]&
 			indices[j] = addVertex(v[0] as UShort, v[1] as UShort, v[2] as UShort,
 								   mesh verts, firstVert, nextVert, mesh nverts)
 			if (v[3] & RC_BORDER_VERTEX) {
@@ -837,12 +841,12 @@ rcBuildPolyMesh: func(cset: RCContourSet&, nvp: Int, mesh: RCPolyMesh) -> Bool {
 		npolys := 0
 		memset(polys, 0xff, maxVertsPerCont*nvp*sizeof(UShort))
 		for (j: Int in 0..ntris) {
-			int* t = &tris[j*3]
+			int* t = tris[j*3]&
 			if (t[0] != t[1] && t[0] != t[2] && t[1] != t[2]) {
 				polys[npolys*nvp+0] = indices[t[0]] as UShort
 				polys[npolys*nvp+1] = indices[t[1]] as UShort
 				polys[npolys*nvp+2] = indices[t[2]] as UShort
-				npolys++
+				npolys+=1
 			}
 		}
 		if (!npolys)
@@ -856,9 +860,9 @@ rcBuildPolyMesh: func(cset: RCContourSet&, nvp: Int, mesh: RCPolyMesh) -> Bool {
 				bestPa, bestPb, bestEa, bestEb: Int
 				
 				for (j: Int in 0..npolys-1) {
-					pj: UShort* = &polys[j*nvp]
+					pj: UShort* = polys[j*nvp]&
 					for (k in j+1..npolys) {
-						UShort* pk = &polys[k*nvp]
+						UShort* pk = polys[k*nvp]&
 						ea, eb: Int
 						v := getPolyMergeValue(pj, pk, mesh verts, ea, eb, nvp)
 						if (v > bestMergeVal) {
@@ -873,11 +877,11 @@ rcBuildPolyMesh: func(cset: RCContourSet&, nvp: Int, mesh: RCPolyMesh) -> Bool {
 				
 				if (bestMergeVal > 0) {
 					// Found best, merge.
-					UShort* pa = &polys[bestPa*nvp]
-					UShort* pb = &polys[bestPb*nvp]
+					UShort* pa = polys[bestPa*nvp]&
+					UShort* pb = polys[bestPb*nvp]&
 					mergePolys(pa, pb, bestEa, bestEb, tmpPoly, nvp)
-					memcpy(pb, &polys[(npolys-1)*nvp], sizeof(UShort)*nvp)
-					npolys--
+					memcpy(pb, polys[(npolys-1)*nvp]&, sizeof(UShort)*nvp)
+					npolys-=1
 				} else {
 					// Could not merge any polygons, stop.
 					break
@@ -887,14 +891,14 @@ rcBuildPolyMesh: func(cset: RCContourSet&, nvp: Int, mesh: RCPolyMesh) -> Bool {
 		
 		// Store polygons.
 		for (j: Int in 0..npolys) {
-			p: UShort* = &mesh polys[mesh npolys*nvp*2]
-			q: UShort* = &polys[j*nvp]
+			p: UShort* = mesh polys[mesh npolys*nvp*2]&
+			q: UShort* = polys[j*nvp]&
 			for (k in 0..nvp)
 				p[k] = q[k]
-			mesh regs[mesh.npolys] = cont reg
-			mesh areas[mesh.npolys] = cont area
-			mesh npolys++
-			if (mesh.npolys > maxTris) {
+			mesh regs[mesh npolys] = cont reg
+			mesh areas[mesh npolys] = cont area
+			mesh npolys+=1
+			if (mesh npolys > maxTris) {
 				if (rcGetLog())
 					rcGetLog() log(RCLogCategory RC_LOG_ERROR, "rcBuildPolyMesh: Too many polygons %d (max:%d).", mesh npolys, maxTris)
 				return false
@@ -934,7 +938,7 @@ rcBuildPolyMesh: func(cset: RCContourSet&, nvp: Int, mesh: RCPolyMesh) -> Bool {
 	return true
 }
 
-rcMergePolyMeshes: func(meshes: RCPolyMesh**, nmeshes: Int, mesh: RCPolyMesh&) -> Bool {
+rcMergePolyMeshes: func(meshes: RCPolyMesh**, nmeshes: Int, mesh: RCPolyMesh@) -> Bool {
 	if (!nmeshes || !meshes)
 		return true
 	
@@ -1023,17 +1027,17 @@ rcMergePolyMeshes: func(meshes: RCPolyMesh**, nmeshes: Int, mesh: RCPolyMesh&) -
 		oz: UShort = floor((pmesh bmin[2]-mesh bmin[2])/mesh cs+0.5) as UShort
 		
 		for (j: Int in 0..(pmesh nverts)) {
-			v: UShort* = &pmesh verts[j*3]
+			v: UShort* = pmesh verts[j*3]&
 			vremap[j] = addVertex(v[0]+ox, v[1], v[2]+oz,
 								  mesh verts, firstVert, nextVert, mesh nverts)
 		}
 		
 		for (j: Int in 0..(pmesh npolys)) {
-			tgt: UShort* = &mesh polys[mesh npolys*2*mesh nvp]
-			src: UShort* = &pmesh polys[j*2*mesh nvp]
+			tgt: UShort* = mesh polys[mesh npolys*2*mesh nvp]&
+			src: UShort* = pmesh polys[j*2*mesh nvp]&
 			mesh regs[mesh npolys] = pmesh regs[j]
 			mesh areas[mesh npolys] = pmesh areas[j]
-			mesh npolys++
+			mesh npolys+=1
 			for (k in 0..(mesh nvp)) {
 				if (src[k] == RC_MESH_NULL_IDX) break
 				tgt[k] = vremap[src[k]]
@@ -1049,7 +1053,6 @@ rcMergePolyMeshes: func(meshes: RCPolyMesh**, nmeshes: Int, mesh: RCPolyMesh&) -
 	}
 	
 	endTime := rcGetPerformanceTimer()
-	
 	if (rcGetBuildTimes())
 		rcGetBuildTimes() mergePolyMesh += rcGetDeltaTimeUsec(startTime, endTime)
 	

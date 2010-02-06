@@ -1,3 +1,6 @@
+use retour
+import Retour/[Retour, Timer]
+
 overlapBounds: inline func(amin, amax, bmin, bmax: Float*) -> Bool {
 	overlap := true
 	overlap = (amin[0] > bmax[0] || amax[0] < bmin[0]) ? false : overlap
@@ -6,13 +9,13 @@ overlapBounds: inline func(amin, amax, bmin, bmax: Float*) -> Bool {
 	return overlap
 }
 
-overlapInterval: inline func(UShort amin, UShort amax, UShort bmin, UShort bmax) -> Bool {
+overlapInterval: inline func(amin, amax, bmin, bmax: UShort) -> Bool {
 	if (amax < bmin) return false
 	if (amin > bmax) return false
 	return true
 }
 
-allocSpan: static func(hf: RCHeightfield&) -> RCSpan* {
+allocSpan: static func(hf: RCHeightfield@) -> RCSpan* {
 	// If running out of memory, allocate new page and update the freelist.
 	if (!hf freelist || !hf freelist next) {
 		// Create new page.
@@ -26,8 +29,8 @@ allocSpan: static func(hf: RCHeightfield&) -> RCSpan* {
 		hf pools = pool
 		// Add new items to the free list.
 		freelist := hf freelist
-		head: RCSpan* = &pool items[0]
-		it: RCSpan* = &pool items[RC_SPANS_PER_POOL]
+		head: RCSpan* = pool items[0]&
+		it: RCSpan* = pool items[RC_SPANS_PER_POOL]&
 		while (it != head) { // do
 			--it
 			it next = freelist
@@ -42,14 +45,14 @@ allocSpan: static func(hf: RCHeightfield&) -> RCSpan* {
 	return it
 }
 
-freeSpan: static func(RCHeightfield& hf, RCSpan* ptr) {
+freeSpan: static func(hf: RCHeightfield@, ptr: RCSpan*) {
 	if (!ptr) return
 	// Add the node in front of the free list.
 	ptr next = hf freelist
 	hf freelist = ptr
 }
 
-addSpan: static func(hf: RCHeightfield&, x, y: Int, smin, smax, flags: UShort, flagMergeThr: Int) {
+addSpan: static func(hf: RCHeightfield@, x, y: Int, smin, smax, flags: UShort, flagMergeThr: Int) {
 	idx := x + y*hf width
 	
 	s := allocSpan(hf)
@@ -122,20 +125,20 @@ clipPoly: static func(inz: Float*, n: Int, out: Float*, pnx, pnz, pd: Float) -> 
 			out[m*3+0] = in[j*3+0] + (in[i*3+0] - in[j*3+0])*s
 			out[m*3+1] = in[j*3+1] + (in[i*3+1] - in[j*3+1])*s
 			out[m*3+2] = in[j*3+2] + (in[i*3+2] - in[j*3+2])*s
-			m++
+			m+=1
 		}
 		if (inb) {
 			out[m*3+0] = in[i*3+0]
 			out[m*3+1] = in[i*3+1]
 			out[m*3+2] = in[i*3+2]
-			m++
+			m+=1
 		}
 		j=i
 	}
 	return m
 }
 
-rasterizeTri: static func(v0, v1, v2: Float*, flags: UInt8, hf: RCHeightfield&, bmin, bmax: Float*, cs, ics, ich: Float, flagMergeThr: Int) {
+rasterizeTri: static func(v0, v1, v2: Float*, flags: UInt8, hf: RCHeightfield@, bmin, bmax: Float*, cs, ics, ich: Float, flagMergeThr: Int) {
 	w := hf width
 	h := hf height
 	tmin, tmax: Float[3]
@@ -166,11 +169,11 @@ rasterizeTri: static func(v0, v1, v2: Float*, flags: UInt8, hf: RCHeightfield&, 
 	// Clip the triangle Into all grid cells it touches.
 	inz, out, inrow: Float[7*3]
 	
-	for (y := y0; y <= y1; ++y) {
+	for (y := y0; y <= y1; y+=1) {
 		// Clip polygon to row.
-		vcopy(&inz[0], v0)
-		vcopy(&inz[1*3], v1)
-		vcopy(&inz[2*3], v2)
+		vcopy(inz[0]&, v0)
+		vcopy(inz[1*3]&, v1)
+		vcopy(inz[2*3]&, v2)
 		nvrow := 3
 		cz: Float = bmin[2] + y*cs
 		nvrow = clipPoly(inz, nvrow, out, 0, 1, -cz)
@@ -178,7 +181,7 @@ rasterizeTri: static func(v0, v1, v2: Float*, flags: UInt8, hf: RCHeightfield&, 
 		nvrow = clipPoly(out, nvrow, inrow, 0, -1, cz+cs)
 		if (nvrow < 3) continue
 		
-		for (x := x0; x <= x1; ++x) {
+		for (x := x0; x <= x1; x+=1) {
 			// Clip polygon to column.
 			nv := nvrow
 			cx := bmin[0] + x*cs
@@ -188,7 +191,7 @@ rasterizeTri: static func(v0, v1, v2: Float*, flags: UInt8, hf: RCHeightfield&, 
 			if (nv < 3) continue
 			
 			// Calculate min and max of the span.
-			smin: Float = inz[1], smax = inz[1]
+			smin := inz; smax := inz[1]
 			for (i: Int in 1..nv) {
 				smin = rcMin(smin, inz[i*3+1])
 				smax = rcMax(smax, inz[i*3+1])
@@ -211,7 +214,7 @@ rasterizeTri: static func(v0, v1, v2: Float*, flags: UInt8, hf: RCHeightfield&, 
 	}
 }
 
-rcRasterizeTriangle: func(v0, v1, v2: Float*, flags: UInt8, solid: RCHeightfield&, flagMergeThr: Int) {
+rcRasterizeTriangle: func(v0, v1, v2: Float*, flags: UInt8, solid: RCHeightfield@, flagMergeThr: Int) {
 	startTime := rcGetPerformanceTimer()
 
 	ics: Float = 1.0/solid cs
@@ -222,16 +225,16 @@ rcRasterizeTriangle: func(v0, v1, v2: Float*, flags: UInt8, solid: RCHeightfield
 		rcGetBuildTimes() rasterizeTriangles += rcGetDeltaTimeUsec(startTime, endTime)
 }
 
-rcRasterizeTriangles: func(verts: Float*, nv: Int, tris: Int*, flags: UInt8, nt: Int, solid: RCHeightfield&, flagMergeThr: Int) {
+rcRasterizeTriangles: func(verts: Float*, nv: Int, tris: Int*, flags: UInt8, nt: Int, solid: RCHeightfield@, flagMergeThr: Int) {
 	startTime := rcGetPerformanceTimer()
 	
 	ics = 1.0/solid cs
 	ich = 1.0/solid ch
 	// Rasterize triangles.
 	for (i: Int in 0..nt) {
-		v0: Float* = &verts[tris[i*3+0]*3]
-		v1: Float* = &verts[tris[i*3+1]*3]
-		v2: Float* = &verts[tris[i*3+2]*3]
+		v0: Float* = verts[tris[i*3+0]*3]&
+		v1: Float* = verts[tris[i*3+1]*3]&
+		v2: Float* = verts[tris[i*3+2]*3]&
 		// Rasterize.
 		rasterizeTri(v0, v1, v2, flags[i], solid, solid bmin, solid bmax, solid cs, ics, ich, flagMergeThr)
 	}
@@ -240,16 +243,16 @@ rcRasterizeTriangles: func(verts: Float*, nv: Int, tris: Int*, flags: UInt8, nt:
 		rcGetBuildTimes() rasterizeTriangles += rcGetDeltaTimeUsec(startTime, endTime)
 }
 
-rcRasterizeTriangles: func(verts: Float*, nv: Int, tris: UShort*, flags: UInt8*, nt: Int, solid: RCHeightfield&, flagMergeThr: Int) {
+rcRasterizeTriangles: func(verts: Float*, nv: Int, tris: UShort*, flags: UInt8*, nt: Int, solid: RCHeightfield@, flagMergeThr: Int) {
 	startTime := rcGetPerformanceTimer()
 	
 	ics: Float = 1.0/solid cs
 	ich: Float = 1.0/solid ch
 	// Rasterize triangles.
 	for (i: Int in 0..nt) {
-		v0: Float* = &verts[tris[i*3+0]*3]
-		v1: Float* = &verts[tris[i*3+1]*3]
-		v2: Float* = &verts[tris[i*3+2]*3]
+		v0: Float* = verts[tris[i*3+0]*3]&
+		v1: Float* = verts[tris[i*3+1]*3]&
+		v2: Float* = verts[tris[i*3+2]*3]&
 		// Rasterize.
 		rasterizeTri(v0, v1, v2, flags[i], solid, solid bmin, solid bmax, solid cs, ics, ich, flagMergeThr)
 	}
@@ -258,16 +261,16 @@ rcRasterizeTriangles: func(verts: Float*, nv: Int, tris: UShort*, flags: UInt8*,
 		rcGetBuildTimes() rasterizeTriangles += rcGetDeltaTimeUsec(startTime, endTime)
 }
 
-rcRasterizeTriangles func(verts: Float*, flags: UInt8*, nt: Int, solid: RCHeightfield&, flagMergeThr: Int) {
+rcRasterizeTriangles: func(verts: Float*, flags: UInt8*, nt: Int, solid: RCHeightfield@, flagMergeThr: Int) {
 	startTime := rcGetPerformanceTimer()
 	
 	ics: Float = 1.0/solid cs
 	ich: Float = 1.0/solid ch
 	// Rasterize triangles.
 	for (i: Int in 0..nt) {
-		v0 = &verts[(i*3+0)*3]
-		v1 = &verts[(i*3+1)*3]
-		v2 = &verts[(i*3+2)*3]
+		v0 = verts[(i*3+0)*3]&
+		v1 = verts[(i*3+1)*3]&
+		v2 = verts[(i*3+2)*3]&
 		// Rasterize.
 		rasterizeTri(v0, v1, v2, flags[i], solid, solid bmin, solid bmax, solid cs, ics, ich, flagMergeThr)
 	}

@@ -1,26 +1,29 @@
-getCornerHeight: static func(x, y, i, dir: Int, chf: RCCompactHeightfield&, isBorderVertex: Bool&)   Int {
-	s: RCCompactSpan& = chf spans[i]
+use retour
+import Retour/[Retour, Log, Timer]
+
+getCornerHeight: static func(x, y, i, dir: Int, chf: RCCompactHeightfield@, isBorderVertex: Bool@) -> Int {
+	s := chf spans[i]
 	ch := s y as Int
 	dirp := (dir + 1) & 0x3
 	
-	regs: UInt[] = [0, 0, 0, 0]
+	regs: UInt[4] = [0, 0, 0, 0]
 	
 	// Combine region and area codes in order to prevent
 	// border vertices which are in between two areas to be removed. 
 	regs[0] = chf regs[i] | (chf areas[i] << 16)
 	
 	if (rcGetCon(s, dir) != RC_NOT_CONNECTED) {
-		ax =: x + rcGetDirOffsetX(dir)
-		ay =: y + rcGetDirOffsetY(dir)
+		ax := x + rcGetDirOffsetX(dir)
+		ay := y + rcGetDirOffsetY(dir)
 		ai = (chf cells[ax+ay*chf width] index as Int) + rcGetCon(s, dir)
-		asp: RCCompactSpan& = chf spans[ai]
+		asp := chf spans[ai]
 		ch = rcMax(ch, asp y as Int)
 		regs[1] = chf regs[ai] | (chf areas[ai] << 16)
 		if (rcGetCon(asp, dirp) != RC_NOT_CONNECTED) {
 			ax2 := ax + rcGetDirOffsetX(dirp)
 			ay2 := ay + rcGetDirOffsetY(dirp)
-			ai2 := (chf cells[ax2+ay2*chf width index as Int) + rcGetCon(asp, dirp)
-			as2: RCCompactSpan& = chf spans[ai2]
+			ai2 := (chf cells[ax2+ay2*chf width] index as Int) + rcGetCon(asp, dirp)
+			as2 := chf spans[ai2]
 			ch = rcMax(ch, as2 y as Int)
 			regs[2] = chf regs[ai2] | (chf areas[ai2] << 16)
 		}
@@ -29,19 +32,19 @@ getCornerHeight: static func(x, y, i, dir: Int, chf: RCCompactHeightfield&, isBo
 		ax = x + rcGetDirOffsetX(dirp)
 		ay = y + rcGetDirOffsetY(dirp)
 		ai = (chf cells[ax+ay*chf width] index as Int) + rcGetCon(s, dirp)
-		asp: RCCompactSpan& = chf spans[ai]
+		asp := chf spans[ai]
 		ch = rcMax(ch, asp y as Int)
 		regs[3] = chf regs[ai] | (chf areas[ai] << 16)
 		if (rcGetCon(asp, dir) != RC_NOT_CONNECTED) {
 			ax2 := ax + rcGetDirOffsetX(dir)
 			ay2 := ay + rcGetDirOffsetY(dir)
-			ai2 := chf cells[ax2+ay2*chf width] index as Int) + rcGetCon(asp, dir)
-			as2: RCCompactSpan& = chf spans[ai2]
+			ai2 := (chf cells[ax2+ay2*chf width] index as Int) + rcGetCon(asp, dir)
+			as2 := chf spans[ai2]
 			ch = rcMax(ch, as2 y as Int)
 			regs[2] = chf regs[ai2] | (chf areas[ai2] << 16)
 		}
 	}
-
+	
 	// Check if the vertex is special edge vertex, these vertices will be removed later.
 	for (j in 0..4) {
 		a := j
@@ -64,19 +67,19 @@ getCornerHeight: static func(x, y, i, dir: Int, chf: RCCompactHeightfield&, isBo
 	return ch
 }
 
-walkContour: static func(x, y, i: Int, chf: RCCompactHeightfield&, flags: UInt8*, points: RCIntArray&) {
+walkContour: static func(x, y, i: Int, chf: RCCompactHeightfield@, flags: UInt8*, points: RCIntArray@) {
 	// Choose the first non-connected edge
 	dir: UInt8 = 0
 	while ((flags[i] & (1 << dir)) == 0)
-		dir++
+		dir += 1
 	
 	startDir := dir
 	starti := i
 	
 	area := chf areas[i]
 	
-	iter := 0
-	while (++iter < 40000) {
+	iter := 1 // iter := 0
+	while (iter < 40000) { //while (++iter < 40000)
 		if (flags[i] & (1 << dir)) {
 			// Choose the edge corner
 			isBorderVertex := false
@@ -85,12 +88,12 @@ walkContour: static func(x, y, i: Int, chf: RCCompactHeightfield&, flags: UInt8*
 			py := getCornerHeight(x, y, i, dir, chf, isBorderVertex)
 			pz := y
 			match dir {
-				case 0 => pz++; break
-				case 1 => px++; pz++; break
-				case 2 => px++; break
+				case 0 => pz+=1; break
+				case 1 => px+=1; pz+=1; break
+				case 2 => px+=1; break
 			}
 			r := 0
-			s: RCCompactSpan& = chf spans[i]
+			s := chf spans[i]
 			if (rcGetCon(s, dir) != RC_NOT_CONNECTED) {
 				ax := x + rcGetDirOffsetX(dir)
 				ay := y + rcGetDirOffsetY(dir)
@@ -114,9 +117,9 @@ walkContour: static func(x, y, i: Int, chf: RCCompactHeightfield&, flags: UInt8*
 			ni := -1
 			nx := x + rcGetDirOffsetX(dir)
 			ny := y + rcGetDirOffsetY(dir)
-			s: RCCompactSpan& = chf.spans[i]
+			s := chf spans[i]
 			if (rcGetCon(s, dir) != RC_NOT_CONNECTED) {
-				nc: RCCompactCell& = chf cells[nx+ny*chf width]
+				nc := chf cells[nx+ny*chf width]
 				ni = nc index as Int + rcGetCon(s, dir)
 			}
 			if (ni == -1) {
@@ -132,10 +135,11 @@ walkContour: static func(x, y, i: Int, chf: RCCompactHeightfield&, flags: UInt8*
 		if (starti == i && startDir == dir) {
 			break
 		}
+		iter += 1
 	}
 }
 
-distancePtSeg: static func(x, y, z, px, py, pz, qx, qy, qz: Int)   Float {
+distancePtSeg: static func(x, y, z, px, py, pz, qx, qy, qz: Int) -> Float {
 /*	float pqx = (float)(qx - px)
 	float pqy = (float)(qy - py)
 	float pqz = (float)(qz - pz)
@@ -176,7 +180,7 @@ distancePtSeg: static func(x, y, z, px, py, pz, qx, qy, qz: Int)   Float {
 	return dx*dx + dz*dz
 }
 
-simplifyContour: static func(points, simplified: RCIntArray&, maxError: Float, maxEdgeLen: Int) {
+simplifyContour: static func(points, simplified: RCIntArray@, maxError: Float, maxEdgeLen: Int) {
 	// Add initial points.
 	noConnections := true
 	for (i := 0; i < (points size()); i+=4) {
@@ -188,7 +192,7 @@ simplifyContour: static func(points, simplified: RCIntArray&, maxError: Float, m
 	
 	if (noConnections) {
 		// If there is no connections at all,
-		// create some initial points for the simplification process. 
+		// create some initial points for the simplification process.
 		// Find lower-left and upper-right vertices of the contour.
 		llx := points[0]
 		lly := points[1]
@@ -198,7 +202,7 @@ simplifyContour: static func(points, simplified: RCIntArray&, maxError: Float, m
 		ury := points[1]
 		urz := points[2]
 		uri := 0
-		for (i: Int = 0; i < points size(); i+=4) {
+		for (i := 0; i < points size(); i+=4) {
 			int x = points[i+0]
 			int y = points[i+1]
 			int z = points[i+2]
@@ -237,7 +241,7 @@ simplifyContour: static func(points, simplified: RCIntArray&, maxError: Float, m
 				simplified push(points[i*4+2])
 				simplified push(i)
 			}
-		}       
+		}
 	}
 	
 	// Add points until all raw points are within
@@ -306,7 +310,7 @@ simplifyContour: static func(points, simplified: RCIntArray&, maxError: Float, m
 			simplified[(i+1)*4+2] = points[maxi*4+2]
 			simplified[(i+1)*4+3] = maxi
 		} else {
-			++i
+			i += 1
 		}
 	}
 	
@@ -355,12 +359,12 @@ simplifyContour: static func(points, simplified: RCIntArray&, maxError: Float, m
 				simplified[(i+1)*4+2] = points[maxi*4+2]
 				simplified[(i+1)*4+3] = maxi
 			} else {
-				++i
+				i += 1
 			}
 		}
 	}
 	
-	for (int i = 0; i < simplified.size()/4; ++i) {
+	for (i: Int in 0..(simplified size()/4)) {
 		// The edge vertex flag is taken from the current raw point,
 		// and the neighbour region is take from the next raw point.
 		ai := (simplified[i*4+3]+1) % pn
@@ -370,7 +374,7 @@ simplifyContour: static func(points, simplified: RCIntArray&, maxError: Float, m
 	
 }
 
-removeDegenerateSegments: static func(RCIntArray& simplified) {
+removeDegenerateSegments: static func(simplified: RCIntArray@) {
 	// Remove adjacent vertices which are equal on xz-plane,
 	// or else the triangulator will get confused.
 	for (i: Int in 0..(simplified size()/4)) {
@@ -392,24 +396,24 @@ removeDegenerateSegments: static func(RCIntArray& simplified) {
 	}
 }
 
-calcAreaOfPolygon2D: static func(verts: Int*, nverts: Int)   Int {
+calcAreaOfPolygon2D: static func(verts: Int*, nverts: Int) -> Int {
 	area := 0
 	j := nverts-1
-	for (i: Int in 0. nverts) {
-		vi: Int* = &verts[i*4]
-		vj: Int* = &verts[j*4]
+	for (i: Int in 0..nverts) {
+		vi: Int* = verts[i*4]&
+		vj: Int* = verts[j*4]&
 		area += vi[0] * vj[2] - vj[0] * vi[2]
 		j = i
 	}
 	return (area+1) / 2
 }
 
-getClosestIndices: static func(vertsa: Int*, nvertsa: Int, vertsb: Int*, nvertsb: Int, ia, ib: Int&) {
+getClosestIndices: static func(vertsa: Int*, nvertsa: Int, vertsb: Int*, nvertsb: Int, ia, ib: Int@) {
 	closestDist := 0xfffffff
-	for (i in 0. nvertsa) {
-		va: Int* = &vertsa[i*4]
-		for (j: Int in 0. nvertsb) {
-			vb: Int* = &vertsb[j*4]
+	for (i in 0..nvertsa) {
+		va: Int* = vertsa[i*4]&
+		for (j: Int in 0..nvertsb) {
+			vb: Int* = vertsb[j*4]&
 			dx := vb[0] - va[0]
 			dz := vb[2] - va[2]
 			d := dx*dx + dz*dz
@@ -422,47 +426,47 @@ getClosestIndices: static func(vertsa: Int*, nvertsa: Int, vertsb: Int*, nvertsb
 	}
 }
 
-mergeContours: static func(ca, cb: rcContour&, ia, ib: Int)   Bool {
+mergeContours: static func(ca, cb: RCContour@, ia, ib: Int) -> Bool {
 	maxVerts := ca nverts + cb nverts + 2
-	verts: Int* = rcAllocArray(Int, maxVerts*4)
+	verts := Array<Int> new(maxVerts*4)
 	if (!verts)
 		return false
 	
 	nv := 0
 	// Copy contour A.
-	for (i := 0; i <= (ca nverts); ++i) {
-		dst: Int* = &verts[nv*4]
-		src: Int* = &ca verts[((ia+i)%ca nverts)*4]
+	for (i := 0; i <= (ca nverts); i += 1) {
+		dst: Int* = verts[nv*4]&
+		src: Int* = ca verts[((ia+i)%ca nverts)*4]&
 		dst[0] = src[0]
 		dst[1] = src[1]
 		dst[2] = src[2]
 		dst[3] = src[3]
-		nv++
+		nv += 1
 	}
 	
 	// Copy contour B
-	for (int i = 0; i <= cb nverts; ++i) {
-		dst: Int* = &verts[nv*4]
-		src: Int* = &cb verts[((ib+i)%cb nverts)*4]
+	for (i := 0; i <= cb nverts; i += 1) {
+		dst: Int* = verts[nv*4]&
+		src: Int* = cb verts[((ib+i)%cb nverts)*4]&
 		dst[0] = src[0]
 		dst[1] = src[1]
 		dst[2] = src[2]
 		dst[3] = src[3]
-		nv++
+		nv += 1
 	}
 	
-	delete [] ca verts
+	//delete [] ca verts
 	ca verts = verts
 	ca nverts = nv
-
-	delete [] cb verts
-	cb verts = 0
-	cb nverts = 0
+	
+	//delete [] cb verts
+	cb verts = null
+	cb nverts = null
 	
 	return true
 }
 
-rcBuildContours: func(chf: RCCompactHeightfield&, maxError: Float, maxEdgeLen: Int, cset: rcContourSet&)   Bool {
+rcBuildContours: func(chf: RCCompactHeightfield@, maxError: Float, maxEdgeLen: Int, cset: RCContourSet@) -> Bool {
 	w := chf width
 	h := chf height
 	
@@ -474,7 +478,7 @@ rcBuildContours: func(chf: RCCompactHeightfield&, maxError: Float, maxEdgeLen: I
 	cset ch = chf ch
 	
 	maxContours := chf maxRegions*2
-	cset conts = new rcContour[maxContours]
+	cset conts = new RCContour[maxContours]
 	if (!cset conts)
 		return false
 	cset nconts = 0
@@ -490,10 +494,10 @@ rcBuildContours: func(chf: RCCompactHeightfield&, maxError: Float, maxEdgeLen: I
 	// Mark boundaries.
 	for (y in 0..h) {
 		for (x in 0..w) {
-			c: RCCompactCell& = chf cells[x+y*w]
+			c := chf cells[x+y*w]
 			for (i: Int in (c index as Int)..(c index + c count as Int)) {
 				res: UInt8 = 0
-				s: RCCompactSpan& = chf spans[i]
+				s := chf spans[i]
 				if (!chf regs[i] || (chf regs[i] & RC_BORDER_REG)) {
 					flags[i] = 0
 					continue
@@ -521,7 +525,7 @@ rcBuildContours: func(chf: RCCompactHeightfield&, maxError: Float, maxEdgeLen: I
 	
 	for (y in 0..h) {
 		for (x in 0..w) {
-			c: RCCompactCell& = chf cells[x+y*w]
+			c := chf cells[x+y*w]
 			for (i in (c index as Int)..(c index + c count as Int)) {
 				if (flags[i] == 0 || flags[i] == 0xf) {
 					flags[i] = 0
@@ -547,18 +551,19 @@ rcBuildContours: func(chf: RCCompactHeightfield&, maxError: Float, maxEdgeLen: I
 						return false
 					}
 					
-					cont: rcContour* = &(cset conts[cset nconts++])
+					cont := cset conts[cset nconts]&
+					cset nconts += 1
 					
 					cont nverts = simplified size()/4
-					cont verts = rcAllocArray(Int, cont nverts*4)
-					memcpy(cont verts, &simplified[0], sizeof(Int)*cont nverts*4)
+					cont verts = Array<Int> new(cont nverts*4)
+					memcpy(cont verts, simplified[0]&, sizeof(Int)*cont nverts*4)
 					
 					cont nrverts = verts size()/4
-					cont rverts = rcAllocArray(Int, cont nrverts*4)
-					memcpy(cont rverts, &verts[0], sizeof(Int)*cont nrverts*4)
+					cont rverts = Array<Int> new(cont nrverts*4)
+					memcpy(cont rverts, verts[0]&, sizeof(Int)*cont nrverts*4)
 					
 /*					cont cx = cont cy = cont cz = 0
-					for (int i = 0; i < cont nverts; ++i)
+					for (i := 0; i < cont nverts; ++i)
 					{
 						cont cx += cont verts[i*4+0]
 						cont cy += cont verts[i*4+1]
@@ -579,7 +584,7 @@ rcBuildContours: func(chf: RCCompactHeightfield&, maxError: Float, maxEdgeLen: I
 	// Sometimes the previous algorithms can fail and create several countours
 	// per area. This pass will try to merge the holes into the main region.
 	for (i in 0..cset nconts) {
-		cont: rcContour& = cset conts[i]
+		cont := cset conts[i]
 		// Check if the contour is would backwards.
 		if (calcAreaOfPolygon2D(cont verts, cont nverts) < 0) {
 			// Find another contour which has the same region ID.
@@ -598,7 +603,7 @@ rcBuildContours: func(chf: RCCompactHeightfield&, maxError: Float, maxEdgeLen: I
 				if (rcGetLog())
 					rcGetLog() log(RCLogCategory RC_LOG_WARNING, "rcBuildContours: Could not find merge target for bad contour %d.", i)
 			} else {
-				mcont: rcContour& = cset conts[mergeIdx]
+				mcont: RCContour& = cset conts[mergeIdx]
 				// Merge by closest points.
 				ia, ib: Int
 				getClosestIndices(mcont verts, mcont nverts, cont verts, cont nverts, ia, ib)

@@ -4,3 +4,4 @@ import Retour/Retour
 main: func() {
 	"weeaboo" println()
 }
+

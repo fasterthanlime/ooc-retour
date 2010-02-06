@@ -1,5 +1,5 @@
 // Common helper functions
-rcSwap: inline func<T>(a, b: T&) { T t = a; a = b; b = t }
+rcSwap: inline func<T>(a, b: T@) { T t = a; a = b; b = t }
 rcMin: inline func<T>(a, b: T) -> T { return a < b ? a : b }
 rcMax: inline func<T>(a, b: T) -> T { return a > b ? a : b }
 rcAbs: inline func<T>(a: T) -> T { return a < 0 ? -a : a }
@@ -60,7 +60,7 @@ vdist: inline func(v1, v2: Float*) -> Float {
 	return sqrtf(dx*dx + dy*dy + dz*dz)
 }
 
-vdistSqrinline inline func(v1, v2: Float*) -> Float {
+vdistSqrinline: inline func(v1, v2: Float*) -> Float {
 	dx := v2[0] - v1[0]
 	dy := v2[1] - v1[1]
 	dz := v2[2] - v1[2]
@@ -81,22 +81,22 @@ vequal: inline func(p0, p1: Float*) -> Bool {
 }
 
 nextPow2: inline func(v: UInt) -> UInt {
-	v--
+	v -= 1
 	v |= v >> 1
 	v |= v >> 2
 	v |= v >> 4
 	v |= v >> 8
 	v |= v >> 16
-	v++
+	v += 1
 	return v
 }
 
 ilog2: inline func(v: UInt) -> UInt {
 	r, shift: UInt
-	r = (v > 0xffff) << 4; v >>= r
-	shift = (v > 0xff) << 3; v >>= shift; r |= shift
-	shift = (v > 0xf) << 2; v >>= shift; r |= shift
-	shift = (v > 0x3) << 1; v >>= shift; r |= shift
+	r = (v > 0xffff) << 4; v = v >> r	// >>= isn't working :'(
+	shift = (v > 0xff) << 3; v = v >> shift; r |= shift
+	shift = (v > 0xf) << 2; v = v >> shift; r |= shift
+	shift = (v > 0x3) << 1; v = v >> shift; r |= shift
 	r |= (v >> 1)
 	return r
 }
@@ -203,15 +203,15 @@ closestPtPointTriangle: func(closest, p, a, b, c: Float*) {
 	}
 	
 	// P inside face region. Compute Q through its barycentric coordinates (u,v,w)
-	Float denom = 1.0f / (va + vb + vc)
-	Float v = vb * denom
-	Float w = vc * denom
+	denom: Float = 1.0 / (va + vb + vc)
+	v: Float = vb * denom
+	w: Float = vc * denom
 	closest[0] = a[0] + ab[0] * v + ac[0] * w
 	closest[1] = a[1] + ab[1] * v + ac[1] * w
 	closest[2] = a[2] + ab[2] * v + ac[2] * w
 }
 
-intersectSegmentPoly2D: func(p0, p1, verts: Float*, nverts: Int, tmin, tmax: Float&, segMin, segMax: Int&) -> Bool {
+intersectSegmentPoly2D: func(p0, p1, verts: Float*, nverts: Int, tmin, tmax: Float@, segMin, segMax: Int@) -> Bool {
 	EPS: static const Float = 0.00000001
 	
 	tmin = 0
@@ -225,8 +225,8 @@ intersectSegmentPoly2D: func(p0, p1, verts: Float*, nverts: Int, tmin, tmax: Flo
 	j := nverts-1
 	for (i: Int in 0..nverts) {
 		edge, diff: Float[3]
-		vsub(edge, &verts[i*3], &verts[j*3])
-		vsub(diff, p0, &verts[j*3])
+		vsub(edge, verts[i*3]&, verts[j*3]&)
+		vsub(diff, p0, verts[j*3]&)
 		n := vperp2D(edge, diff)
 		d := -vperp2D(edge, dir)
 		if (fabs(d) < EPS) {
@@ -261,7 +261,7 @@ intersectSegmentPoly2D: func(p0, p1, verts: Float*, nverts: Int, tmin, tmax: Flo
 	return true
 }
 
-distancePtSegSqr2D: func(pt, p, q: Float*, t: Float&) -> Float {
+distancePtSegSqr2D: func(pt, p, q: Float*, t: Float@) -> Float {
 	pqx: Float = q[0] - p[0]
 	pqz: Float = q[2] - p[2]
 	dx: Float = pt[0] - p[0]
@@ -276,12 +276,12 @@ distancePtSegSqr2D: func(pt, p, q: Float*, t: Float&) -> Float {
 	return dx*dx + dz*dz
 }
 
-calcPolyCenter: func(Float* tc, UShort* idx, Int nidx, Float* verts){
+calcPolyCenter: func(tc: Float*, idx: UShort*, nidx: Int, verts: Float*) {
 	tc[0] = 0.0
 	tc[1] = 0.0
 	tc[2] = 0.0
 	for (j: Int in 0..nidx) {
-		v: Float* = &verts[idx[j]*3]
+		v: Float* = verts[idx[j]*3]&
 		tc[0] += v[0]
 		tc[1] += v[1]
 		tc[2] += v[2]
@@ -292,7 +292,7 @@ calcPolyCenter: func(Float* tc, UShort* idx, Int nidx, Float* verts){
 	tc[2] *= s
 }
 
-closestHeightPointTriangle: func(p, a, b, c: Float*, h: Float&) -> Bool {
+closestHeightPointTriangle: func(p, a, b, c: Float*, h: Float@) -> Bool {
 	v0, v1, v2: Float[3]
 	vsub(v0, c, a)
 	vsub(v1, b, a)
@@ -321,15 +321,15 @@ closestHeightPointTriangle: func(p, a, b, c: Float*, h: Float&) -> Bool {
 	return false
 }
 
-distancePtPolyEdgesSqr(Float* pt, Float* verts, Int nverts, ed, et: Float*) -> Bool {
+distancePtPolyEdgesSqr: func(pt, verts: Float*, nverts: Int, ed, et: Float*) -> Bool {
 	// TODO: Replace pnpoly with triArea2D tests?
 	c := false
 	j := nverts-1
 	for (i: Int in 0..nverts) {
-		vi: Float* = &verts[i*3]
-		vj: Float* = &verts[j*3]
+		vi: Float* = verts[i*3]&
+		vj: Float* = verts[j*3]&
 		if (((vi[2] > pt[2]) != (vj[2] > pt[2])) &&
-			(pt[0] < (vj[0]-vi[0]) * (pt[2]-vi[2]) / (vj[2]-vi[2]) + vi[0]) )
+			(pt[0] < (vj[0]-vi[0]) * (pt[2]-vi[2]) / (vj[2]-vi[2]) + vi[0]))
 			c = !c
 		ed[j] = distancePtSegSqr2D(pt, vj, vi, et[j])
 		j = i

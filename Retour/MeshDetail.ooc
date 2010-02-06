@@ -1,3 +1,6 @@
+use retour
+import Retour/[Retour]
+
 RC_UNSET_HEIGHT: static const UShort = 0xffff
 
 RCHeightPatch: class {
@@ -29,7 +32,7 @@ vcross2: inline func(p1, p2, p3: Float*) -> Float {
 	return u1 * v2 - v1 * u2
 }
 
-circumCircle: static func(p1, p2, p3, c: Float*, r: Float&) -> Bool {
+circumCircle: static func(p1, p2, p3, c: Float*, r: Float@) -> Bool {
 	EPS: static const Float = 1e-6
 	
 	cp := vcross2(p1, p2, p3)
@@ -76,7 +79,7 @@ distPtTri: static func(p, a, b, c: Float*) -> Float {
 	return FLT_MAX
 }
 
-distancePtSeg: static func(Float* pt, Float* p, Float* q) -> Float {
+distancePtSeg: static func(pt, p, q: Float*) -> Float {
 	pqx := q[0] - p[0]
 	pqy := q[1] - p[1]
 	pqz := q[2] - p[2]
@@ -99,7 +102,7 @@ distancePtSeg: static func(Float* pt, Float* p, Float* q) -> Float {
 	return dx*dx + dy*dy + dz*dz
 }
 
-distancePtSeg2d: static func(Float* pt, Float* p, Float* q) -> Float {
+distancePtSeg2d: static func(pt, p, q: Float*) -> Float {
 	pqx := q[0] - p[0]
 	pqz := q[2] - p[2]
 	dx := pt[0] - p[0]
@@ -122,9 +125,9 @@ distancePtSeg2d: static func(Float* pt, Float* p, Float* q) -> Float {
 distToTriMesh: static func(p, verts: Float*, nverts: Int, tris: Int*, ntris: Int) -> Float {
 	dmin := FLT_MAX
 	for (i: Int in 0. ntris) {
-		va: Float* = &verts[tris[i*4+0]*3]
-		vb: Float* = &verts[tris[i*4+1]*3]
-		vc: Float* = &verts[tris[i*4+2]*3]
+		va: Float* = verts[tris[i*4+0]*3]&
+		vb: Float* = verts[tris[i*4+1]*3]&
+		vc: Float* = verts[tris[i*4+2]*3]&
 		d := distPtTri(p, va, vb, vc)
 		if (d < dmin)
 			dmin = d
@@ -138,8 +141,8 @@ distToPoly: static func(nvert: Int, verts, p: Float*) -> Float {
 	c, j: Int
 	j = nvert-1
 	for (i: Int in 0..nvert) {
-		vi: Float* = &verts[i*3]
-		vj: Float* = &verts[j*3]
+		vi: Float* = verts[i*3]&
+		vj: Float* = verts[j*3]&
 		if (((vi[2] > p[2]) != (vj[2] > p[2])) &&
 			(p[0] < (vj[0]-vi[0]) * (p[2]-vi[2]) / (vj[2]-vi[2]) + vi[0]))
 			c = !c
@@ -149,7 +152,7 @@ distToPoly: static func(nvert: Int, verts, p: Float*) -> Float {
 	return c ? -dmin : dmin
 }
 
-getHeight: static func(fx, fz, cs, ics: Float, hp: RCHeightPatch&) -> UShort {
+getHeight: static func(fx, fz, cs, ics: Float, hp: RCHeightPatch@) -> UShort {
 	ix := floor(fx*ics + 0.01) as Int
 	iz := floor(fz*ics + 0.01) as Int
 	ix = rcClamp(ix-hp xmin, 0, hp width)
@@ -186,14 +189,14 @@ EdgeValues: class {
 
 findEdge: static func(edges: Int*, nedges, s, t: Int) -> Int {
 	for (i: Int in 0..nedges) {
-		e: Int* = &edges[i*4]
+		e: Int* = edges[i*4]&
 		if ((e[0] == s && e[1] == t) || (e[0] == t && e[1] == s))
 			return i
 	}
 	return EdgeValues UNDEF
 }
 
-addEdge: static func(edges: Int*, nedges: Int&, maxEdges, s, t, l, r: Int) -> Int {
+addEdge: static func(edges: Int*, nedges: Int@, maxEdges, s, t, l, r: Int) -> Int {
 	if (nedges >= maxEdges) {
 		if (rcGetLog())
 			rcGetLog() log(RCLogCategory RC_LOG_ERROR, "addEdge: Too many edges (%d/%d).", nedges, maxEdges)
@@ -203,18 +206,20 @@ addEdge: static func(edges: Int*, nedges: Int&, maxEdges, s, t, l, r: Int) -> In
 	// Add edge if not already in the triangulation. 
 	e := findEdge(edges, nedges, s, t)
 	if (e == EdgeValues UNDEF) {
-		e: Int* = &edges[nedges*4]
+		e: Int* = edges[nedges*4]&
 		e[0] = s
 		e[1] = t
 		e[2] = l
 		e[3] = r
-		return nedges++
+		sretval := nedges
+		nedges+=1
+		return sretval
 	} else {
 		return EdgeValues UNDEF
 	}
 }
 
-updateLeftFace: static func(Int* e, Int s, Int t, Int f) {
+updateLeftFace: static func(e: Int*, s, t, f: Int) {
 	if (e[0] == s && e[1] == t && e[2] == EdgeValues UNDEF)
 		e[2] = f
 	else if (e[1] == s && e[0] == t && e[3] == EdgeValues UNDEF)
@@ -240,16 +245,16 @@ overlapEdges: static func(pts: Float*, edges: Int*, nedges, s1, t1: Int) -> Bool
 		// Same or connected edges do not overlap.
 		if (s0 == s1 || s0 == t1 || t0 == s1 || t0 == t1)
 			continue
-		if (overlapSegSeg2d(&pts[s0*3], &pts[t0*3], &pts[s1*3], &pts[t1*3]))
+		if (overlapSegSeg2d(pts[s0*3]&, pts[t0*3]&, pts[s1*3]&, pts[t1*3]&))
 			return true
 	}
 	return false
 }
 
-completeFacet: static func(pts: Float*, npts: Int, edges: Int*, nedges: Int&, maxEdges: Int, nfaces: Int&, e: Int) {
+completeFacet: static func(pts: Float*, npts: Int, edges: Int*, nedges: Int@, maxEdges: Int, nfaces: Int@, e: Int) {
 	EPS: static const Float = 1e-5
 	
-	edge: Int* = &edges[e*4]
+	edge: Int* = edges[e*4]&
 	
 	// Cache s and t.
 	s, t: Int
@@ -268,16 +273,16 @@ completeFacet: static func(pts: Float*, npts: Int, edges: Int*, nedges: Int&, ma
 	pt := npts
 	c: Float[3] // = [0, 0, 0]
 	r: Float = -1.0
-	for (u: Int = 0..npts) {
+	for (u: Int in 0..npts) {
 		if (u == s || u == t) continue
-		if (vcross2(&pts[s*3], &pts[t*3], &pts[u*3]) > EPS) {
+		if (vcross2(pts[s*3]@, pts[t*3]@, pts[u*3]&) > EPS) {
 			if (r < 0) {
 				// The circle is not updated yet, do it now.
 				pt = u
-				circumCircle(&pts[s*3], &pts[t*3], &pts[u*3], c, r)
+				circumCircle(pts[s*3]&, pts[t*3]&, pts[u*3]&, c, r)
 				continue
 			}
-			d := vdist2(c, &pts[u*3])
+			d := vdist2(c, pts[u*3])
 			tol: Float = 0.001
 			if (d > r*(1+tol)) {
 				// Outside current circumcircle, skip.
@@ -285,7 +290,7 @@ completeFacet: static func(pts: Float*, npts: Int, edges: Int*, nedges: Int&, ma
 			} else if (d < r*(1-tol)) {
 				// Inside safe circumcircle, update circle.
 				pt = u
-				circumCircle(&pts[s*3], &pts[t*3], &pts[u*3], c, r)
+				circumCircle(pts[s*3]&, pts[t*3]&, pts[u*3]&, c, r)
 			} else {
 				// Inside epsilon circum circle, do extra tests to make sure the edge is valid.
 				// s-u and t-u cannot overlap with s-pt nor t-pt if they exists.
@@ -295,7 +300,7 @@ completeFacet: static func(pts: Float*, npts: Int, edges: Int*, nedges: Int&, ma
 					continue
 				// Edge is valid.
 				pt = u
-				circumCircle(&pts[s*3], &pts[t*3], &pts[u*3], c, r)
+				circumCircle(pts[s*3]&, pts[t*3]&, pts[u*3]&, c, r)
 			}
 		}
 	}
@@ -303,29 +308,29 @@ completeFacet: static func(pts: Float*, npts: Int, edges: Int*, nedges: Int&, ma
 	// Add new triangle or update edge info if s-t is on hull. 
 	if (pt < npts) {
 		// Update face information of edge being completed. 
-		updateLeftFace(&edges[e*4], s, t, nfaces)
+		updateLeftFace(edges[e*4]&, s, t, nfaces)
 		
 		// Add new edge or update face info of old edge. 
 		e = findEdge(edges, nedges, pt, s)
 		if (e == EdgeValues UNDEF)
 		    addEdge(edges, nedges, maxEdges, pt, s, nfaces, EdgeValues UNDEF)
 		else
-		    updateLeftFace(&edges[e*4], pt, s, nfaces)
+		    updateLeftFace(edges[e*4]&, pt, s, nfaces)
 		
 		// Add new edge or update face info of old edge. 
 		e = findEdge(edges, nedges, t, pt)
 		if (e == EdgeValues UNDEF)
 		    addEdge(edges, nedges, maxEdges, t, pt, nfaces, EdgeValues UNDEF)
 		else
-		    updateLeftFace(&edges[e*4], t, pt, nfaces)
+		    updateLeftFace(edges[e*4]&, t, pt, nfaces)
 		
-		nfaces++
+		nfaces+=1
 	} else {
-		updateLeftFace(&edges[e*4], s, t, EdgeValues HULL)
+		updateLeftFace(edges[e*4]&, s, t, EdgeValues HULL)
 	}
 }
 
-delaunayHull: static func(npts: Int, pts: Float*, nhull: Int, hull: Int*, tris: RCIntArray&, edges: RCIntArray&) {
+delaunayHull: static func(npts: Int, pts: Float*, nhull: Int, hull: Int*, tris: RCIntArray@, edges: RCIntArray@) {
 	nfaces := 0
 	nedges := 0
 	maxEdges := npts*10
@@ -333,17 +338,17 @@ delaunayHull: static func(npts: Int, pts: Float*, nhull: Int, hull: Int*, tris: 
 	
 	j := nhull-1
 	for (i: Int in 0..nhull) {
-		addEdge(&edges[0], nedges, maxEdges, hull[j], hull[i], EdgeValues HULL, EdgeValues UNDEF)
+		addEdge(edges[0]&, nedges, maxEdges, hull[j], hull[i], EdgeValues HULL, EdgeValues UNDEF)
 		j = i
 	}
 	
 	currentEdge := 0
 	while (currentEdge < nedges) {
 		if (edges[currentEdge*4+2] == EdgeValues UNDEF)
-			completeFacet(pts, npts, &edges[0], nedges, maxEdges, nfaces, currentEdge)
+			completeFacet(pts, npts, edges[0]&, nedges, maxEdges, nfaces, currentEdge)
 		if (edges[currentEdge*4+3] == EdgeValues UNDEF)
-			completeFacet(pts, npts, &edges[0], nedges, maxEdges, nfaces, currentEdge)
-		currentEdge++
+			completeFacet(pts, npts, edges[0]&, nedges, maxEdges, nfaces, currentEdge)
+		currentEdge+=1
 	}
 
 	// Create tris
@@ -352,10 +357,10 @@ delaunayHull: static func(npts: Int, pts: Float*, nhull: Int, hull: Int*, tris: 
 		tris[i] = -1
 	
 	for (i: Int in 0..nedges) {
-		e: Int* = &edges[i*4]
+		e: Int* = edges[i*4]&
 		if (e[3] >= 0) {
 			// Left face
-			t: Int* = &tris[e[3]*4]
+			t: Int* = tris[e[3]*4]&
 			if (t[0] == -1) {
 				t[0] = e[0]
 				t[1] = e[1]
@@ -366,7 +371,7 @@ delaunayHull: static func(npts: Int, pts: Float*, nhull: Int, hull: Int*, tris: 
 		}
 		if (e[2] >= 0) {
 			// Right
-			t: Int* = &tris[e[2]*4]
+			t: Int* = tris[e[2]*4]&
 			if (t[0] == -1) {
 				t[0] = e[1]
 				t[1] = e[0]
@@ -378,7 +383,7 @@ delaunayHull: static func(npts: Int, pts: Float*, nhull: Int, hull: Int*, tris: 
 	}
 	
 	for (i: Int in 0..(tris size()/4)) {
-		t: Int* = &tris[i*4]
+		t: Int* = tris[i*4]&
 		if (t[0] == -1 || t[1] == -1 || t[2] == -1) {
 			if (rcGetLog())
 				rcGetLog() log(RCLogCategory RC_LOG_WARNING, "delaunayHull: Removing dangling face %d [%d,%d,%d].", i, t[0], t[1], t[2])
@@ -395,8 +400,8 @@ delaunayHull: static func(npts: Int, pts: Float*, nhull: Int, hull: Int*, tris: 
 
 
 buildPolyDetail: static func(zin: Float*, nin: Int, sampleDist, sampleMaxError: Float,
-							chf: RCCompactHeightfield&, hp: RCHeightPatch&, verts: Float*,
-							nverts: Int&, tris, edges, samples: RCIntArray&) -> Bool {
+							chf: RCCompactHeightfield@, hp: RCHeightPatch@, verts: Float*,
+							nverts: Int@, tris, edges, samples: RCIntArray@) -> Bool {
 	MAX_VERTS: static const Int = 256
 	MAX_EDGE: static const Int = 64
 	edge: Float[(MAX_EDGE+1)*3]
@@ -405,7 +410,7 @@ buildPolyDetail: static func(zin: Float*, nin: Int, sampleDist, sampleMaxError: 
 	
 	nverts = 0
 	for (i: Int in 0..nin)
-		vcopy(&verts[i*3], &zin[i*3])
+		vcopy(verts[i*3]&, zin[i*3]&)
 	nverts = nin
 	
 	cs := chf cs
@@ -417,12 +422,12 @@ buildPolyDetail: static func(zin: Float*, nin: Int, sampleDist, sampleMaxError: 
 	if (sampleDist > 0) {
 		j := nin-1
 		for (i: Int in 0..nin) {
-			vj: Float* = &zin[j*3]
-			vi: Float* = &zin[i*3]
+			vj: Float* = zin[j*3]&
+			vi: Float* = zin[i*3]&
 			swapped := false
 			// Make sure the segments are always handled in same order
 			// using lexological sort or else there will be seams.
-			if (fabsf(vj[0]-vi[0]) < 1e-6f) {
+			if (fabsf(vj[0]-vi[0]) < 1e-6) {
 				if (vj[2] > vi[2]) {
 					rcSwap(vj,vi)
 					swapped = true
@@ -441,9 +446,9 @@ buildPolyDetail: static func(zin: Float*, nin: Int, sampleDist, sampleMaxError: 
 			if (nn > MAX_EDGE) nn = MAX_EDGE
 			if (nverts+nn >= MAX_VERTS)
 				nn = MAX_VERTS-1-nverts
-			for (Int k = 0; k <= nn; ++k) {
+			for (k := 0; k <= nn; k+=1) {
 				u: Float = (k as Float)/(nn as Float)
-				pos: Float* = &edge[k*3]
+				pos: Float* = edge[k*3]&
 				pos[0] = vj[0] + dx*u
 				pos[2] = vj[2] + dz*u
 				pos[1] = getHeight(pos[0], pos[2], cs, ics, hp)*chf ch
@@ -451,16 +456,17 @@ buildPolyDetail: static func(zin: Float*, nin: Int, sampleDist, sampleMaxError: 
 			// Simplify samples.
 			idx: Int[MAX_EDGE] = [0, nn]
 			nidx := 2
-			for (k := 0; k < nidx-1) {
+			k := 0
+			while (k < (nidx-1)) {
 				a := idx[k]
 				b := idx[k+1]
-				va: Float* = &edge[a*3]
-				vb: Float* = &edge[b*3]
+				va: Float* = edge[a*3]&
+				vb: Float* = edge[b*3]&
 				// Find maximum deviation along the segment.
 				maxd: Float = 0.0
 				maxi := -1
-				for (Int m = a+1; m < b; ++m) {
-					d := distancePtSeg(&edge[m*3],va,vb)
+				for (m: Int in (a+1)..b) {
+					d := distancePtSeg(edge[m*3]&, va, vb)
 					if (d > maxd) {
 						maxd = d
 						maxi = m
@@ -472,25 +478,26 @@ buildPolyDetail: static func(zin: Float*, nin: Int, sampleDist, sampleMaxError: 
 					for (m := nidx; m > k; --m)
 						idx[m] = idx[m-1]
 					idx[k+1] = maxi
-					nidx++
+					nidx+=1
 				} else {
-					++k
+					k+=1
 				}
 			}
 			
-			hull[nhull++] = j
+			hull[nhull] = j
+			nhull+=1
 			// Add new vertices.
 			if (swapped) {
-				for (k := nidx-2; k > 0; --k) {
-					vcopy(&verts[nverts*3], &edge[idx[k]*3])
-					hull[nhull++] = nverts
-					nverts++
+				for (k := nidx-2; k > 0; k-=1) {
+					vcopy(verts[nverts*3]&, edge[idx[k]*3]&)
+					hull[nhull] = nverts
+					nhull+=1; nhull+=1
 				}
 			} else {
-				for (k := 1..(nidx-1)) {
-					vcopy(&verts[nverts*3], &edge[idx[k]*3])
-					hull[nhull++] = nverts
-					nverts++
+				for (k: Int in 1..(nidx-1)) {
+					vcopy(verts[nverts*3]&, edge[idx[k]*3]&)
+					hull[nhull] = nverts
+					nhull+=1; nverts+=1
 				}
 			}
 			j=i
@@ -507,7 +514,7 @@ buildPolyDetail: static func(zin: Float*, nin: Int, sampleDist, sampleMaxError: 
 		// Could not triangulate the poly, make sure there is some valid data there.
 		if (rcGetLog())
 			rcGetLog() log(RCLogCategory RC_LOG_WARNING, "buildPolyDetail: Could not triangulate polygon, adding default data.")
-		for (i: Int in 2..nverts) {
+		for (i: Int in 2. nverts) {
 			tris push(0)
 			tris push(i-1)
 			tris push(i)
@@ -522,8 +529,8 @@ buildPolyDetail: static func(zin: Float*, nin: Int, sampleDist, sampleMaxError: 
 		vcopy(bmin, zin)
 		vcopy(bmax, zin)
 		for (i: Int in 1..nin) {
-			vmin(bmin, &zin[i*3])
-			vmax(bmax, &zin[i*3])
+			vmin(bmin, zin[i*3]&)
+			vmax(bmax, zin[i*3]&)
 		}
 		x0 := floor(bmin[0]/sampleDist) as Int
 		x1 := ceil(bmax[0]/sampleDist) as Int
@@ -551,12 +558,12 @@ buildPolyDetail: static func(zin: Float*, nin: Int, sampleDist, sampleMaxError: 
 			// Find sample with most error.
 			bestpt: Float[3]
 			bestd: Float = 0.0
-			for (Int i = 0; i < nsamples; ++i) {
+			for (i: Int in 0..nsamples) {
 				pt: Float[3]
 				pt[0] = samples[i*3+0]*sampleDist
 				pt[1] = samples[i*3+1]*chf ch
 				pt[2] = samples[i*3+2]*sampleDist
-				d := distToTriMesh(pt, verts, nverts, &tris[0], tris size()/4)
+				d := distToTriMesh(pt, verts, nverts, tris[0]&, tris size()/4)
 				if (d < 0) continue; // did not hit the mesh.
 				if (d > bestd) {
 					bestd = d
@@ -568,8 +575,8 @@ buildPolyDetail: static func(zin: Float*, nin: Int, sampleDist, sampleMaxError: 
 				break
 
 			// Add the new sample poInt.
-			vcopy(&verts[nverts*3], bestpt)
-			nverts++
+			vcopy(verts[nverts*3]&, bestpt)
+			nverts+=1
 			
 			// Create new triangulation.
 			// TODO: Incremental add instead of full rebuild.
@@ -584,7 +591,7 @@ buildPolyDetail: static func(zin: Float*, nin: Int, sampleDist, sampleMaxError: 
 	return true
 }
 
-getHeightData: static func(chf: RCCompactHeightfield&, poly: UShort*, npoly: Int, verts: UShort*, RCHeightPatch& hp, RCIntArray& stack) {
+getHeightData: static func(chf: RCCompactHeightfield@, poly: UShort*, npoly: Int, verts: UShort*, hp: RCHeightPatch@, stack: RCIntArray@) {
 	// Floodfill the heightfield to get 2D height data,
 	// starting at vertex locations as seeds.
 	
@@ -600,11 +607,11 @@ getHeightData: static func(chf: RCCompactHeightfield&, poly: UShort*, npoly: Int
 			az < hp ymin || az >= hp ymin+hp height)
 			continue
 			
-		c: RCCompactCell& = chf cells[ax+az*chf width]
+		c := chf cells[ax+az*chf width]
 		dmin: Int = RC_UNSET_HEIGHT
 		ai := -1
 		for (i: Int in (c index as Int)..(c index+c count) as Int) {
-			s: RCCompactSpan& = chf spans[i]
+			s := chf spans[i]
 			d := rcAbs(ay - (s y as Int))
 			if (d < dmin) {
 				ai = i
@@ -620,7 +627,7 @@ getHeightData: static func(chf: RCCompactHeightfield&, poly: UShort*, npoly: Int
 	
 	// Not no match, try polygon center.
 	if (stack size() == 0) {
-		cx, cy, cz: Int = 0
+		cx, cy, cz: Int
 		for (j: Int in 0..npoly) {
 			cx += verts[poly[j]*3+0] as Int
 			cy += verts[poly[j]*3+1] as Int
@@ -636,7 +643,7 @@ getHeightData: static func(chf: RCCompactHeightfield&, poly: UShort*, npoly: Int
 			dmin: Int = RC_UNSET_HEIGHT
 			ci := -1
 			for (i: Int in (c index as Int)..(c index+c count) as Int) {
-				s: RCCompactSpan& = chf spans[i]
+				s := chf spans[i]
 				d: Int = rcAbs(cy - (s y as Int))
 				if (d < dmin) {
 					ci = i
@@ -661,7 +668,7 @@ getHeightData: static func(chf: RCCompactHeightfield&, poly: UShort*, npoly: Int
 		if (hp data[idx] != RC_UNSET_HEIGHT)
 			continue
 		
-		cs: RCCompactSpan& = chf spans[ci]
+		cs := chf spans[ci]
 		hp data[idx] = cs y
 		
 		for (dir: Int in 0..4) {
@@ -689,8 +696,8 @@ getEdgeFlags: static func(va, vb, vpoly: Float*, npoly: Int) -> UInt8 {
 	thrSqr: static Float = rcSqr(0.001)
 	j: Int = npoly-1
 	for (i: Int in 0..npoly) {
-		if (distancePtSeg2d(va, &vpoly[j*3], &vpoly[i*3]) < thrSqr && 
-			distancePtSeg2d(vb, &vpoly[j*3], &vpoly[i*3]) < thrSqr)
+		if (distancePtSeg2d(va, vpoly[j*3]&, vpoly[i*3]&) < thrSqr && 
+			distancePtSeg2d(vb, vpoly[j*3]&, vpoly[i*3]&) < thrSqr)
 			return 1
 		j = i
 	}
@@ -705,7 +712,7 @@ getTriFlags: static func(va, vb, vc, vpoly: Float*, npoly: Int) -> UInt8 {
 	return flags
 }
 
-rcBuildPolyMeshDetail: func(mesh: RCPolyMesh&, chf: RCCompactHeightfield&, sampleDist, sampleMaxError: Float, dmesh: RCPolyMeshDetail&) -> Bool {
+rcBuildPolyMeshDetail: func(mesh: RCPolyMesh@, chf: RCCompactHeightfield@, sampleDist, sampleMaxError: Float, dmesh: RCPolyMeshDetail@) -> Bool {
 	startTime := rcGetPerformanceTimer()
 	
 	if (mesh nverts == 0 || mesh npolys == 0)
@@ -723,15 +730,16 @@ rcBuildPolyMeshDetail: func(mesh: RCPolyMesh&, chf: RCCompactHeightfield&, sampl
 	verts: Float[256*3]
 	hp: RCHeightPatch
 	nPolyVerts := 0
-	maxhw := 0, maxhh := 0
+	maxhw := 0
+	maxhh := 0
 	
-	bounds := rcAllocArray(Int, mesh npolys*4)
+	bounds := Array<Int> new(mesh npolys*4)
 	if (!bounds) {
 		if (rcGetLog())
 			rcGetLog() log(RCLogCategory RC_LOG_ERROR, "rcBuildPolyMeshDetail: Out of memory 'bounds' (%d).", mesh npolys*4)
 		return false
 	}
-	poly := rcAllocArray(Float, nvp*3)
+	poly := Array<Float> new(nvp*3)
 	if (!poly) {
 		if (rcGetLog())
 			rcGetLog() log(RCLogCategory RC_LOG_ERROR, "rcBuildPolyMeshDetail: Out of memory 'poly' (%d).", nvp*3)
@@ -740,28 +748,32 @@ rcBuildPolyMeshDetail: func(mesh: RCPolyMesh&, chf: RCCompactHeightfield&, sampl
 	
 	// Find max size for a polygon area.
 	for (i: Int in 0..(mesh npolys)) {
-		p: UShort* = &mesh polys[i*nvp*2]
-		xmin: Int& = bounds[i*4+0]
-		xmax: Int& = bounds[i*4+1]
-		ymin: Int& = bounds[i*4+2]
-		ymax: Int& = bounds[i*4+3]
+		p: UShort* = mesh polys[i*nvp*2]
+		// Hmm.. This is where references come in handy (outside of function args)!
+		// I really don't wanna do it like this..
+		xmin: Int* = bounds[i*4+0]&
+		xmax: Int* = bounds[i*4+1]&
+		ymin: Int* = bounds[i*4+2]&
+		ymax: Int* = bounds[i*4+3]&
 		xmin = chf width
 		xmax = 0
 		ymin = chf height
 		ymax = 0
 		for (j: Int in 0..nvp) {
 			if(p[j] == RC_MESH_NULL_IDX) break
-			UShort* v = &mesh verts[p[j]*3]
-			xmin = rcMin(xmin, v[0] as Int)
-			xmax = rcMax(xmax, v[0]as Int)
-			ymin = rcMin(ymin, v[2] as Int)
-			ymax = rcMax(ymax, v[2] as Int)
-			nPolyVerts++
+			 v := mesh verts[p[j]*3]&
+			// whuuuuuu
+			xmin@ = rcMin(xmin, v[0] as Int)
+			xmax@ = rcMax(xmax, v[0]as Int)
+			ymin@ = rcMin(ymin, v[2] as Int)
+			ymax@ = rcMax(ymax, v[2] as Int)
+			nPolyVerts+=1
 		}
-		xmin = rcMax(0, xmin-1)
-		xmax = rcMin(chf width, xmax+1)
-		ymin = rcMax(0, ymin-1)
-		ymax = rcMin(chf height, ymax+1)
+		// *grumble*
+		xmin@ = rcMax(0, xmin-1)
+		xmax@ = rcMin(chf width, xmax+1)
+		ymin@ = rcMax(0, ymin-1)
+		ymax@ = rcMin(chf height, ymax+1)
 		if (xmin >= xmax || ymin >= ymax) continue
 		maxhw = rcMax(maxhw, xmax-xmin)
 		maxhh = rcMax(maxhh, ymax-ymin)
@@ -803,17 +815,17 @@ rcBuildPolyMeshDetail: func(mesh: RCPolyMesh&, chf: RCCompactHeightfield&, sampl
 	}
 	
 	for (i: Int in 0..(mesh npolys)) {
-		p: UShort* = &mesh polys[i*nvp*2]
+		p: UShort* = mesh polys[i*nvp*2]&
 		
 		// Store polygon vertices for processing.
 		npoly := 0
 		for (j: Int in 0..nvp) {
 			if(p[j] == RC_MESH_NULL_IDX) break
-			v: UShort* = &mesh verts[p[j]*3]
+			v: UShort* = mesh verts[p[j]*3]&
 			poly[j*3+0] = v[0]*cs
 			poly[j*3+1] = v[1]*ch
 			poly[j*3+2] = v[2]*cs
-			npoly++
+			npoly+=1
 		}
 		
 		// Get the height data from the area of the polygon.
@@ -830,7 +842,7 @@ rcBuildPolyMeshDetail: func(mesh: RCPolyMesh&, chf: RCCompactHeightfield&, sampl
 		}
 		
 		// Move detail verts to world space.
-		for (j: Int in 0..nverts) {
+		for (j: Int in 0. nverts) {
 			verts[j*3+0] += orig[0]
 			verts[j*3+1] += orig[1] + chf ch; // Is this offset necessary?
 			verts[j*3+2] += orig[2]
@@ -861,16 +873,16 @@ rcBuildPolyMeshDetail: func(mesh: RCPolyMesh&, chf: RCCompactHeightfield&, sampl
 					rcGetLog() log(RCLogCategory RC_LOG_ERROR, "rcBuildPolyMeshDetail: Out of memory 'newv' (%d).", vcap*3)
 				return false
 			}
-			if (dmesh.nverts)
+			if (dmesh nverts)
 				memcpy(newv, dmesh verts, sizeof(Float)*3*dmesh nverts)
 			delete [] dmesh verts
 			dmesh verts = newv
 		}
-		for (j: Int in 0..nverts) {
+		for (j: Int in 0. nverts) {
 			dmesh verts[dmesh nverts*3+0] = verts[j*3+0]
 			dmesh verts[dmesh nverts*3+1] = verts[j*3+1]
 			dmesh verts[dmesh nverts*3+2] = verts[j*3+2]
-			dmesh nverts++
+			dmesh nverts+=1
 		}
 		
 		// Store triangles, allocate more memory if necessary.
@@ -889,12 +901,12 @@ rcBuildPolyMeshDetail: func(mesh: RCPolyMesh&, chf: RCCompactHeightfield&, sampl
 			dmesh tris = newt
 		}
 		for (j: Int in 0. ntris) {
-			t: Int* = &tris[j*4]
+			t: Int* = tris[j*4]&
 			dmesh tris[dmesh ntris*4+0] = t[0] as UInt8
 			dmesh tris[dmesh ntris*4+1] = t[1] as UInt8
 			dmesh tris[dmesh ntris*4+2] = t[2] as UInt8
-			dmesh tris[dmesh ntris*4+3] = getTriFlags(&verts[t[0]*3], &verts[t[1]*3], &verts[t[2]*3], poly, npoly)
-			dmesh ntris++
+			dmesh tris[dmesh ntris*4+3] = getTriFlags(verts[t[0]*3]&, verts[t[1]*3]&, verts[t[2]*3]&, poly, npoly)
+			dmesh ntris+=1
 		}
 	}
 	endTime := rcGetPerformanceTimer()
@@ -905,7 +917,7 @@ rcBuildPolyMeshDetail: func(mesh: RCPolyMesh&, chf: RCCompactHeightfield&, sampl
 	return true
 }
 
-rcMergePolyMeshDetails: func(meshes: RCPolyMeshDetail**, nmeshes: Int, mesh: RCPolyMeshDetail&) -> Bool {
+rcMergePolyMeshDetails: func(meshes: RCPolyMeshDetail**, nmeshes: Int, mesh: RCPolyMeshDetail@) -> Bool {
 	startTime := rcGetPerformanceTimer()
 	
 	maxVerts := 0
@@ -948,30 +960,29 @@ rcMergePolyMeshDetails: func(meshes: RCPolyMeshDetail**, nmeshes: Int, mesh: RCP
 		dm: RCPolyMeshDetail* = meshes[i]
 		if (!dm) continue
 		for (j: Int in 0..(dm nmeshes)) {
-			dst: UShort* = &mesh meshes[mesh nmeshes*4]
-			src: UShort* = &dm meshes[j*4]
+			dst: UShort* = mesh meshes[mesh nmeshes*4]&
+			src: UShort* = dm meshes[j*4]&
 			dst[0] = mesh nverts+src[0]
 			dst[1] = src[1]
 			dst[2] = mesh ntris+src[2]
 			dst[3] = src[3]
-			mesh nmeshes++
+			mesh nmeshes+=1
 		}
 			
 		for (k: Int in 0..(dm nverts)) {
-			vcopy(&mesh verts[mesh nverts*3], &dm verts[k*3])
-			mesh nverts++
+			vcopy(mesh verts[mesh nverts*3]&, dm verts[k*3]&)
+			mesh nverts+=1
 		}
 		for (k: Int in 0..(dm ntris)) {
 			mesh tris[mesh ntris*4+0] = dm tris[k*4+0]
 			mesh tris[mesh ntris*4+1] = dm tris[k*4+1]
 			mesh tris[mesh ntris*4+2] = dm tris[k*4+2]
 			mesh tris[mesh ntris*4+3] = dm tris[k*4+3]
-			mesh ntris++
+			mesh ntris+=1
 		}
 	}
 
 	endTime := rcGetPerformanceTimer()
-	
 	if (rcGetBuildTimes())
 		rcGetBuildTimes() mergePolyMeshDetail += rcGetDeltaTimeUsec(startTime, endTime)
 	

@@ -1,9 +1,11 @@
-rcErodeArea: func(areaId: UInt8, radius: Int, chf: rcCompactHeightfield&) -> Bool {
-	w: Int = chf width
-	h: Int = chf height
+use retour
+import Retour/[Retour]
+
+rcErodeArea: func(areaId: UInt8, radius: Int, chf: RCCompactHeightfield@) -> Bool {
+	w := chf width
+	h := chf height
 	
 	startTime := rcGetPerformanceTimer()
-	
 	dist := rcAllocArray(UInt8, chf spanCount)
 	if (!dist)
 		return false
@@ -14,10 +16,10 @@ rcErodeArea: func(areaId: UInt8, radius: Int, chf: rcCompactHeightfield&) -> Boo
 	// Mark boundary cells.
 	for (y: Int in 0..h) {
 		for (x: Int in 0..w) {
-			c: rcCompactCell& = chf cells[x+y*w]
+			c := chf cells[x+y*w]
 			for (i: Int in c index..(c index + c count)) {
 				if (chf areas[i] != RC_NULL_AREA) {
-					rcCompactSpan& s = chf spans[i]
+					s := chf spans[i]
 					nc: Int = 0
 					for (dir: Int in 0..4) {
 						if (rcGetCon(s, dir) != 0xf) {
@@ -25,7 +27,7 @@ rcErodeArea: func(areaId: UInt8, radius: Int, chf: rcCompactHeightfield&) -> Boo
 							ay := y + rcGetDirOffsetY(dir)
 							ai := (chf cells[ax+ay*w] index as Int) + rcGetCon(s, dir)
 							if (chf areas[ai] == areaId)
-								nc++
+								nc += 1
 						}
 					}
 					// At least one missing neighbour.
@@ -37,19 +39,18 @@ rcErodeArea: func(areaId: UInt8, radius: Int, chf: rcCompactHeightfield&) -> Boo
 	}
 	
 	nd: UInt8
-	
 	// Pass 1
 	for (y in 0..h) {
 		for (x in 0..w) {
-			c: rcCompactCell& = chf cells[x+y*w]
+			c := chf cells[x+y*w]
 			for (i: Int in (c index)..(c index + c count)) {
-				s: rcCompactSpan& = chf.spans[i]
+				s := chf spans[i]
 				if (rcGetCon(s, 0) != 0xf) {
 					// (-1,0)
-					ax =: x + rcGetDirOffsetX(0)
-					ay =: y + rcGetDirOffsetY(0)
-					ai =: (chf cells[ax+ay*w] index) as Int + rcGetCon(s, 0);
-					asp: rcCompactSpan& = chf spans[ai]
+					ax := x + rcGetDirOffsetX(0)
+					ay := y + rcGetDirOffsetY(0)
+					ai := (chf cells[ax+ay*w] index) as Int + rcGetCon(s, 0);
+					asp := chf spans[ai]
 					nd = rcMin((dist[ai] as Int) + 2, 255) as UInt8
 					if (nd < dist[i])
 						dist[i] = nd
@@ -69,7 +70,7 @@ rcErodeArea: func(areaId: UInt8, radius: Int, chf: rcCompactHeightfield&) -> Boo
 					ax := x + rcGetDirOffsetX(3)
 					ay := y + rcGetDirOffsetY(3)
 					ai := (chf cells[ax+ay*w] index as Int) + rcGetCon(s, 3)
-					asp: rcCompactSpan& = chf spans[ai]
+					asp: rcCompactSpan = chf spans[ai]
 					nd = rcMin((dist[ai] as Int) + 2, 255) as UInt8
 					if (nd < dist[i])
 						dist[i] = nd
@@ -91,15 +92,15 @@ rcErodeArea: func(areaId: UInt8, radius: Int, chf: rcCompactHeightfield&) -> Boo
 	// Pass 2
 	for (y := h-1; y >= 0; --y) {
 		for (x := w-1; x >= 0; --x) {
-			c: rcCompactCell& = chf cells[x+y*w]
+			c: rcCompactCell = chf cells[x+y*w]
 			for (i: Int in (c index)..(c index + c count)) {
-				s: rcCompactSpan& = chf spans[i]
+				s := chf spans[i]
 				if (rcGetCon(s, 2) != 0xf) {
 					// (1,0)
 					ax := x + rcGetDirOffsetX(2)
 					ay := y + rcGetDirOffsetY(2)
 					ai := (chf cells[ax+ay*w] index as Int) + rcGetCon(s, 2)
-					asp: rcCompactSpan& = chf spans[ai]
+					asp := chf spans[ai]
 					nd = rcMin((dist[ai] as Int) + 2, 255) as UInt8
 					if (nd < dist[i])
 						dist[i] = nd
@@ -119,7 +120,7 @@ rcErodeArea: func(areaId: UInt8, radius: Int, chf: rcCompactHeightfield&) -> Boo
 					ax := x + rcGetDirOffsetX(1)
 					ay := y + rcGetDirOffsetY(1)
 					ai := (chf cells[ax+ay*w] index as Int) + rcGetCon(s, 1)
-					asp: rcCompactSpan& = chf spans[ai]
+					asp := chf spans[ai]
 					nd = rcMin((dist[ai] as Int) + 2, 255) as UInt8
 					if (nd < dist[i])
 						dist[i] = nd
@@ -155,7 +156,7 @@ rcErodeArea: func(areaId: UInt8, radius: Int, chf: rcCompactHeightfield&) -> Boo
 	return true
 }
 
-rcMarkBoxArea: func(bmin, bmax: Float*, areaId: UInt8, chf: rcCompactHeightfield&) -> Bool {
+rcMarkBoxArea: func(bmin, bmax: Float*, areaId: UInt8, chf: RCCompactHeightfield@) -> Bool {
 	minx := floor((bmin[0] - chf bmin[0]) / chf cs) as Int
 	miny := floor((bmin[1] - chf bmin[1]) / chf ch) as Int
 	minz := floor((bmin[2] - chf bmin[2]) / chf cs) as Int
@@ -170,9 +171,9 @@ rcMarkBoxArea: func(bmin, bmax: Float*, areaId: UInt8, chf: rcCompactHeightfield
 	
 	for (z in minz..maxz) {
 		for (x in minx..maxx) {
-			c: rcCompactCell& = chf cells[x+z*chf width]
+			c := chf cells[x+z*chf width]
 			for (i in (c index)..(c index + c count)) {
-				s: rcCompactSpan& = chf spans[i]
+				s := chf spans[i]
 				if ((s y as Int) >= miny && (s y as Int) < maxy) {
 					if (areaId < chf areas[i])
 						chf areas[i] = areaId

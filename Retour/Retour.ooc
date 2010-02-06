@@ -1,10 +1,11 @@
 use retour
 import structs/Array
 import lang/math
-import Retour/[Common, Util, Log, Timer, Area, Contour, Filter, Mesh, MeshDetail, RecastRasterization, RecastRegion]
+import Retour/[Common, Util, Log, Timer] //, Area, Contour, Filter, Mesh, MeshDetail, Rasterization, Region
 
 RCConfig: class {
 	init: func() {}
+	
 	width, height: Int				// Dimensions of the rasterized heighfield (vx)
 	tileSize: Int					// Width and Height of a tile (vx)
 	borderSize: Int					// Non-navigable Border around the heightfield (vx)
@@ -25,6 +26,7 @@ RCConfig: class {
 
 RCSpan: class {
 	init: func() {}
+	
 	smin: UInt //:15		// Span min height.
 	smax: UInt //:15		// Span max height.
 	flags: UInt //:2		// Span flags.
@@ -35,24 +37,18 @@ RC_SPANS_PER_POOL: static const Int = 2048
 
 RCSpanPool: class {
 	init: func() {}
+	
 	next: RCSpanPool*	// Pointer to next pool.
 	items: RCSpan[1]	// Array of spans (size RC_SPANS_PER_POOL).
 }
 
 RCHeightfield: class {
 	init: func() {}
-	destroy: func() {
-		delete [] spans
-		while (pools) {
-			next: RCSpanPool* = pools next
-			//delete [] reinterpret_cast<UInt8*>(pools)
-			pools = next
-		}
-	}
+	
 	width, height: Int			// Dimension of the heightfield.
 	bmin, bmax: Float[3]		// Bounding box of the heightfield
 	cs, ch: Float				// Cell size and height.
-	spans: RCSpan**				// Heightfield of spans (width*height).
+	spans: Array<RCSpan>		// Heightfield of spans (width*height).
 	pools: RCSpanPool*			// Linked list of span pools.
 	freelist: RCSpan*			// Pointer to next free span.
 }
@@ -72,13 +68,6 @@ RCCompactSpan: class {
 
 RCCompactHeightfield: class {
 	init: func() {}
-	destroy: func() {
-		delete [] cells
-		delete [] spans
-		delete [] dist
-		delete [] regs
-		delete [] areas
-	}
 	
 	width, height: Int					// Width and height of the heighfield.
 	spanCount: Int						// Number of spans in the heightfield.
@@ -87,23 +76,19 @@ RCCompactHeightfield: class {
 	maxRegions: UShort			// Maximum Region Id stored in heightfield.
 	bmin, bmax: Float[3]				// Bounding box of the heightfield.
 	cs, ch: Float						// Cell size and height.
-	cells: RCCompactCell*				// Pointer to width*height cells.
-	spans: RCCompactSpan*				// Pointer to spans.
-	dist: UShort*				// Pointer to per span distance to border.
-	regs: UShort*				// Pointer to per span region ID.
-	areas: UInt8*				// Pointer to per span area ID.
+	cells: Array<RCCompactCell>				// Pointer to width*height cells.
+	spans: Array<RCCompactSpan>				// Pointer to spans.
+	dist: Array<UShort>				// Pointer to per span distance to border.
+	regs: Array<UShort>				// Pointer to per span region ID.
+	areas: Array<UInt8>				// Pointer to per span area ID.
 }
 
 RCContour: class {
 	init: func() {}
-	destroy: func() {
-		delete [] verts
-		delete [] rverts
-	}
 	
-	verts: Int*			// Vertex coordinates, each vertex contains 4 components.
+	verts: Array<Int>			// Vertex coordinates, each vertex contains 4 components.
 	nverts: Int			// Number of vertices.
-	rverts: Int*		// Raw vertex coordinates, each vertex contains 4 components.
+	rverts: Array<Int>		// Raw vertex coordinates, each vertex contains 4 components.
 	nrverts: Int		// Number of raw vertices.
 	reg: UShort			// Region ID of the contour.
 	area: UInt8			// Area ID of the contour.
@@ -111,9 +96,6 @@ RCContour: class {
 
 RCContourSet: class {
 	init: func() {}
-	destroy: func() {
-		delete [] conts
-	}
 	
 	conts: RCContour* 		// Pointer to all contours.
 	nconts: Int				// Number of contours.
@@ -136,18 +118,11 @@ RCPolyMesh: class {
 	init: func() {
 		nvp = 3
 	}
-
-	destroy: func() {
-		delete [] verts
-		delete [] polys
-		delete [] regs
-		delete [] areas
-	}
 	
-	verts: UShort*			// Vertices of the mesh, 3 elements per vertex.
-	polys: UShort*			// Polygons of the mesh, nvp*2 elements per polygon.
-	regs: UShort*			// Region ID of the polygons.
-	areas: UInt8*			// Area ID of polygons.
+	verts: Array<UShort>			// Vertices of the mesh, 3 elements per vertex.
+	polys: Array<UShort>			// Polygons of the mesh, nvp*2 elements per polygon.
+	regs: Array<UShort>			// Region ID of the polygons.
+	areas: Array<UInt8>			// Area ID of polygons.
 	nverts: Int			// Number of vertices.
 	npolys: Int			// Number of polygons.
 	nvp: Int			// Max number of vertices per polygon.
@@ -166,15 +141,10 @@ RCPolyMesh: class {
 // first vertices and using the polymesh vertices instead.
 RCPolyMeshDetail: class {
 	init: func() {}
-	destroy: func() {
-		delete [] meshes
-		delete [] verts
-		delete [] tris
-	}
 	
-	meshes: UShort*		// Pointer to all mesh data.
-	verts: Float*		// Pointer to all vertex data.
-	tris: UInt8*		// Pointer to all triangle data.
+	meshes: Array<UShort>		// Pointer to all mesh data.
+	verts: Array<Float>		// Pointer to all vertex data.
+	tris: Array<UInt8>		// Pointer to all triangle data.
 	nmeshes: Int		// Number of meshes.
 	nverts: Int			// Number of total vertices.
 	ntris: Int			// Number of triangles.
@@ -190,7 +160,6 @@ RCIntArray: class {
 		m_cap = size
 	}
 	
-	destroy: inline func() { delete [] m_data; }
 	resize: func(n: Int) {
 		if (n > m_cap) {
 			if (!m_cap) m_cap = 8
@@ -245,8 +214,8 @@ RCScopedDelete: class <T> {
 
 // enum
 RCSpanFlags: class {
-	RC_WALKABLE: static Int = 0x01
-	RC_LEDGE: static Int = 0x02
+	RC_WALKABLE: static const Int = 0x01
+	RC_LEDGE: static const Int = 0x02
 }
 
 // If heightfield region ID has the following bit set, the region is on border area
@@ -275,23 +244,23 @@ RC_WALKABLE_AREA: static const  UInt8 = 255
 RC_NOT_CONNECTED: static const  Int = 0xf
 
 // Compact span neighbour helpers.
-rcSetCon: inline func(s: RCCompactSpan&, dir, i: Int) {
-	s.con &= ~(0xf << (dir*4))
-	s.con |= (i&0xf) << (dir*4)
+rcSetCon: inline func(s: RCCompactSpan@, dir, i: Int) {
+	s con &= ~(0xf << (dir*4))
+	s con |= (i & 0xf) << (dir*4)
 }
 
-rcGetCon: inline func(s: RCCompactSpan&, dir: Int) -> Int {
-	return (s.con >> (dir*4)) & 0xf
+rcGetCon: inline func(s: RCCompactSpan@, dir: Int) -> Int {
+	return (s con >> (dir*4)) & 0xf
 }
 
-rcGetDirOffsetX: inline func(int dir) -> Int {
+rcGetDirOffsetX: inline func(dir: Int) -> Int {
 	offset: Int[4] = [-1, 0, 1, 0]
-	return offset[dir&0x03]
+	return offset[dir & 0x03]
 }
 
 rcGetDirOffsetY: inline func(dir: Int) -> Int {
 	offset: Int[4] = [0, 1, 0, -1]
-	return offset[dir&0x03]
+	return offset[dir & 0x03]
 }
 
 rcCalcBounds: func(verts: Float*, nv: Int, bmin, bmax: Float*) {
@@ -299,30 +268,28 @@ rcCalcBounds: func(verts: Float*, nv: Int, bmin, bmax: Float*) {
 	vcopy(bmin, verts)
 	vcopy(bmax, verts)
 	for (i in 1..nv) {
-		v: Float* = &verts[i*3]
+		v: Float* = verts[i*3]&
 		vmin(bmin, v)
 		vmax(bmax, v)
 	}
 }
 
 rcCalcGridSize: func(bmin, bmax: Float*, cs: Float, w, h: Int*) {
-	*w = ((bmax[0] - bmin[0])/cs+0.5) as Int
-	*h = ((bmax[2] - bmin[2])/cs+0.5) as Int 
+	w@ = ((bmax[0] - bmin[0])/cs+0.5) as Int
+	h@ = ((bmax[2] - bmin[2])/cs+0.5) as Int
 }
 
-rcCreateHeightfield: func(hf: RCHeightfield&, width, height: Int,
-						 bmin, bmax: Float*,
-						 cs, ch: Float) -> Bool {
+rcCreateHeightfield: func(hf: RCHeightfield@, width, height: Int, bmin, bmax: Float*, cs, ch: Float) -> Bool {
 	hf width = width
 	hf height = height
-	hf spans = new RCSpan*[hf width*hf height]
+	hf spans = Array<RCSpan> new(hf width * hf height)
 	vcopy(hf bmin, bmin)
 	vcopy(hf bmax, bmax)
 	hf cs = cs
 	hf ch = ch
 	if (!hf spans)
 		return false
-	memset(hf spans, 0, sizeof(RCSpan*)*hf width*hf height)
+	//memset(hf spans data, 0, hf spans size)
 	return true
 }
 
@@ -334,40 +301,37 @@ calcTriNormal: static func(v0, v1, v2: Float*, norm: Float*) {
 	vnormalize(norm)
 }
 
-rcMarkWalkableTriangles: func(walkableSlopeAngle: Float,
-							 verts: Float*, nv: Int,
-							 tris: Int*, nt: Int,
-							 flags: UInt8*) {
+rcMarkWalkableTriangles: func(walkableSlopeAngle: Float, verts: Float*, nv: Int, tris: Int*, nt: Int, flags: UInt8*) {
 	walkableThr: Float = cos(walkableSlopeAngle/180.0*Constants pi())
 	norm: Float[3]
 	
 	for (i in 0..nt) {
-		tri: Int* = &tris[i*3]
-		calcTriNormal(&verts[tri[0]*3], &verts[tri[1]*3], &verts[tri[2]*3], norm)
+		tri: Int* = tris[i*3]&
+		calcTriNormal(verts[tri[0]*3]&, verts[tri[1]*3]&, verts[tri[2]*3]&, norm)
 		// Check if the face is walkable.
 		if (norm[1] > walkableThr)
 			flags[i] |= RC_WALKABLE
 	}
 }
 
-getSpanCount: static func(flags: UInt8, hf: RCHeightfield& ) -> Int {
+getSpanCount: static func(flags: UInt8, hf: RCHeightfield@) -> Int {
 	w := hf width
 	h := hf height
 	spanCount := 0
 	for (y: Int in 0..h) {
 		for (x: Int in 0..w) {
-			for (s: RCSpan = hf spans[x + y*w]; s; s = s next) {
+			s := hf spans[x + y*w]
+			while (s) {
 				if (s flags == flags)
-					spanCount++
+					spanCount += 1
+				s = s next
 			}
 		}
 	}
 	return spanCount
 }
 
-rcBuildCompactHeightfield: func(walkableHeight, walkableClimb: Int,
-							   flags: UInt8, hf: RCHeightfield&,
-							   chf: RCCompactHeightfield&) -> Bool {
+rcBuildCompactHeightfield: func(walkableHeight, walkableClimb: Int, flags: UInt8, hf: RCHeightfield@, chf: RCCompactHeightfield@) -> Bool {
 	startTime := rcGetPerformanceTimer()
 	
 	w := hf width
@@ -383,43 +347,44 @@ rcBuildCompactHeightfield: func(walkableHeight, walkableClimb: Int,
 	chf maxRegions = 0
 	vcopy(chf bmin, hf bmin)
 	vcopy(chf bmax, hf bmax)
-	chf bmax[1] += walkableHeight*(hf ch)
+	chf bmax[1] += walkableHeight * hf ch
 	chf cs = hf cs
 	chf ch = hf ch
-	chf cells = rcAllocArray(RCCompactCell, w*h)
+	
+	chf cells = Array<RCCompactCell> new(w*h)
 	if (!chf cells) {
 		if (rcGetLog())
-			rcGetLog() log(RCLogCategory RC_LOG_ERROR, "rcBuildCompactHeightfield: Out of memory 'chf.cells' (%d)", w*h)
+			rcGetLog() log(RCLogCategory RC_LOG_ERROR, "rcBuildCompactHeightfield: Out of memory 'chf cells' (%d)", w*h)
 		return false
 	}
-	memset(chf cells, 0, sizeof(RCCompactCell)*w*h)
+	//memset(chf cells, 0, sizeof(RCCompactCell)*w*h)
 	
-	chf spans = rcAllocArray(RCCompactSpan, spanCount)
+	chf spans = Array<RCCompactSpan> new(spanCount)
 	if (!chfspans) {
 		if (rcGetLog())
-			rcGetLog() log(RCLogCategory RC_LOG_ERROR, "rcBuildCompactHeightfield: Out of memory 'chf.spans' (%d)", spanCount)
+			rcGetLog() log(RCLogCategory RC_LOG_ERROR, "rcBuildCompactHeightfield: Out of memory 'chf spans' (%d)", spanCount)
 		return false
 	}
-	memset(chf spans, 0, sizeof(RCCompactSpan)*spanCount)
+	//memset(chf spans, 0, sizeof(RCCompactSpan)*spanCount)
 	
-	chf areas = rcAllocArray(UInt8, spanCount)
+	chf areas = Array<UInt8> new(spanCount)
 	if (!chf areas) {
 		if (rcGetLog())
-			rcGetLog() log(RCLogCategory RC_LOG_ERROR, "rcBuildCompactHeightfield: Out of memory 'chf.areas' (%d)", spanCount)
+			rcGetLog() log(RCLogCategory RC_LOG_ERROR, "rcBuildCompactHeightfield: Out of memory 'chf areas' (%d)", spanCount)
 		return false
 	}
-	memset(chf areas, RC_WALKABLE_AREA, sizeof(UInt8)*spanCount)
-		
+	memset(chf areas data, RC_WALKABLE_AREA, chf areas size)
+	
 	MAX_HEIGHT: static const Int = 0xffff
 	
 	// Fill in cells and spans.
 	idx := 0
 	for (y: Int in 0..h) {
 		for (x: Int in 0..w) {
-			s: RCSpan* = hf spans[x + y*w]
+			s := hf spans[x + y*w]
 			// If there are no spans at this cell, just leave the data to index=0, count=0.
 			if (!s) continue
-			c: RCCompactCell& = chf cells[x+y*w]
+			c := chf cells[x+y*w]
 			c index = idx
 			c count = 0
 			while (s) {
@@ -428,20 +393,20 @@ rcBuildCompactHeightfield: func(walkableHeight, walkableClimb: Int,
 					top := s next ? (s next smin as Int) : MAX_HEIGHT
 					chf spans[idx] y = rcClamp(bot, 0, 0xffff) as UShort
 					chf spans[idx] h = rcClamp(top - bot, 0, 0xff) as UInt8
-					idx++
-					c count++
+					idx += 1
+					c count += 1
 				}
 				s = s next
 			}
 		}
 	}
-
+	
 	// Find neighbour connections.
 	for (y: Int in 0..h) {
 		for (x: Int in 0..w) {
-			 c: RCCompactCell& = chf cells[x+y*w]
+			 c := chf cells[x+y*w]
 			for (i: Int in (c index)..(c index + c count)) {
-				s: RCCompactSpan& = chf spans[i]
+				s := chf spans[i]
 				for (dir: Int in 0..4) {
 					rcSetCon(s, dir, RC_NOT_CONNECTED)
 					nx: Int = x + rcGetDirOffsetX(dir)
@@ -452,9 +417,9 @@ rcBuildCompactHeightfield: func(walkableHeight, walkableClimb: Int,
 						
 					// Iterate over all neighbour spans and check if any of the is
 					// accessible from current cell.
-					nc: RCCompactCell& = chf cells[nx+ny*w]
+					nc := chf cells[nx+ny*w]
 					for (k: Int in (nc index)..(nc index+nc count)) {
-						ns: RCCompactSpan& = chf spans[k]
+						ns := chf spans[k]
 						bot := rcMax(s y, ns y)
 						top := rcMin(s y+s h, ns y+ns h)
 
@@ -479,20 +444,20 @@ rcBuildCompactHeightfield: func(walkableHeight, walkableClimb: Int,
 	return true
 }
 
-getHeightfieldMemoryUsage: static func(RCHeightfield& hf) -> Int {
+getHeightfieldMemoryUsage: static func(hf: RCHeightfield@) -> Int {
 	size := 0
 	size += sizeof(hf)
-	size += hf width * hf height * sizeof(RCSpan*)
+	size += hf width * hf height * sizeof(Pointer) // sizeof(RCSpan*)
 	
 	pool: RCSpanPool* = hf pools
 	while (pool) {
 		size += (sizeof(RCSpanPool) - sizeof(RCSpan)) + sizeof(RCSpan)*RC_SPANS_PER_POOL
-		pool = pool->next
+		pool = pool next
 	}
 	return size
 }
 
-getCompactHeightFieldMemoryusage: static func(chf: RCCompactHeightfield&) -> Int {
+getCompactHeightFieldMemoryusage: static func(chf: RCCompactHeightfield@) -> Int {
 	size := 0
 	size += sizeof(RCCompactHeightfield)
 	size += sizeof(RCCompactSpan) * chf spanCount
