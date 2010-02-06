@@ -1,3 +1,5 @@
+import os/Time
+
 rcGetPerformanceTimer: func() -> LLong {
 	return Time microtime()
 }

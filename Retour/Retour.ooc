@@ -1,7 +1,7 @@
 use retour
 import structs/Array
 import lang/math
-import Retour/[Common, Util, Log, Timer] //, Area, Contour, Filter, Mesh, MeshDetail, Rasterization, Region
+import Retour/[Common, Log, Timer] //, Area, Contour, Filter, Mesh, MeshDetail, Rasterization, Region
 
 RCConfig: class {
 	init: func() {}
@@ -155,8 +155,8 @@ RCIntArray: class {
 	m_size, m_cap: Int
 	
 	init: func() {}
-	init: func~withSize(size:Int) {
-		m_data = new Int[size]
+	init: func~withSize(size: Int) {
+		m_data = rcAllocArray(Int, size)
 		m_cap = size
 	}
 	
@@ -166,13 +166,13 @@ RCIntArray: class {
 			while (m_cap < n) m_cap *= 2
 			newData := rcAllocArray(Int, m_cap)
 			if (m_size && newData) memcpy(newData, m_data, m_size*sizeof(Int))
-			delete [] m_data
+			//delete [] m_data
 			m_data = newData
 		}
 		m_size = n
 	}
 	
-	push: func(item: Item) {
+	push: func(item: Int) {
 		resize(m_size + 1)
 		m_data[m_size - 1] = item
 	}
@@ -302,7 +302,7 @@ calcTriNormal: static func(v0, v1, v2: Float*, norm: Float*) {
 }
 
 rcMarkWalkableTriangles: func(walkableSlopeAngle: Float, verts: Float*, nv: Int, tris: Int*, nt: Int, flags: UInt8*) {
-	walkableThr: Float = cos(walkableSlopeAngle/180.0*Constants pi())
+	walkableThr: Float = cos(walkableSlopeAngle/180.0 * RCConstants PI)
 	norm: Float[3]
 	
 	for (i in 0..nt) {
@@ -310,7 +310,7 @@ rcMarkWalkableTriangles: func(walkableSlopeAngle: Float, verts: Float*, nv: Int,
 		calcTriNormal(verts[tri[0]*3]&, verts[tri[1]*3]&, verts[tri[2]*3]&, norm)
 		// Check if the face is walkable.
 		if (norm[1] > walkableThr)
-			flags[i] |= RC_WALKABLE
+			flags[i] |= RCSpanFlags RC_WALKABLE
 	}
 }
 
@@ -360,7 +360,7 @@ rcBuildCompactHeightfield: func(walkableHeight, walkableClimb: Int, flags: UInt8
 	//memset(chf cells, 0, sizeof(RCCompactCell)*w*h)
 	
 	chf spans = Array<RCCompactSpan> new(spanCount)
-	if (!chfspans) {
+	if (!chf spans) {
 		if (rcGetLog())
 			rcGetLog() log(RCLogCategory RC_LOG_ERROR, "rcBuildCompactHeightfield: Out of memory 'chf spans' (%d)", spanCount)
 		return false

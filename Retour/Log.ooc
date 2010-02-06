@@ -39,7 +39,7 @@ RCLog: class {
 	}
 	
 	MAX_MESSAGES: static const Int = 1000
-	m_messages: RCLogMessage[RcLog MAX_MESSAGES]
+	m_messages: RCLogMessage[RCLog MAX_MESSAGES]
 	m_messageCount: Int
 }
 

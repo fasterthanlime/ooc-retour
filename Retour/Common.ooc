@@ -1,5 +1,14 @@
+
+RCConstants: class {
+	PI: static const Double = 3.1415926535897932384626
+}
+
+rcAllocArray: func<T>(type: T, count: Int) -> T* {
+	return gc_malloc(T size * count)
+}
+
 // Common helper functions
-rcSwap: inline func<T>(a, b: T@) { T t = a; a = b; b = t }
+rcSwap: inline func<T>(a, b: T@) { t: T = a; a = b; b = t }
 rcMin: inline func<T>(a, b: T) -> T { return a < b ? a : b }
 rcMax: inline func<T>(a, b: T) -> T { return a > b ? a : b }
 rcAbs: inline func<T>(a: T) -> T { return a < 0 ? -a : a }
@@ -7,7 +16,7 @@ rcSqr: inline func<T>(a: T) -> T { return a * a }
 rcClamp: inline func<T>(v, mn, mx: T) -> T { return v < mn ? mn : (v > mx ? mx : v) }
 
 // Common vector helper functions.
-vcross: inline func(dest: Float*, v1, v2: Float*) {
+vcross: inline func(dest, v1, v2: Float*) {
 	dest[0] = v1[1]*v2[2] - v1[2]*v2[1]
 	dest[1] = v1[2]*v2[0] - v1[0]*v2[2]
 	dest[2] = v1[0]*v2[1] - v1[1]*v2[0]
@@ -17,31 +26,31 @@ vdot: inline func(v1, v2: Float*) -> Float {
 	return v1[0]*v2[0] + v1[1]*v2[1] + v1[2]*v2[2]
 }
 
-vmad: inline func(fdest: Float*, v1, v2: Float*, s: Float) {
+vmad: inline func(dest, v1, v2: Float*, s: Float) {
 	dest[0] = v1[0]+v2[0]*s
 	dest[1] = v1[1]+v2[1]*s
 	dest[2] = v1[2]+v2[2]*s
 }
 
-vadd: inline func(dest: Float*, v1, v2: Float*) {
+vadd: inline func(dest, v1, v2: Float*) {
 	dest[0] = v1[0]+v2[0]
 	dest[1] = v1[1]+v2[1]
 	dest[2] = v1[2]+v2[2]
 }
 
-vsub: inline func(dest: Float*, v1, v2: Float*) {
+vsub: inline func(dest, v1, v2: Float*) {
 	dest[0] = v1[0]-v2[0]
 	dest[1] = v1[1]-v2[1]
 	dest[2] = v1[2]-v2[2]
 }
 
-vmin: inline func(mn: Float*, v: Float*) {
+vmin: inline func(mn, v: Float*) {
 	mn[0] = rcMin(mn[0], v[0])
 	mn[1] = rcMin(mn[1], v[1])
 	mn[2] = rcMin(mn[2], v[2])
 }
 
-vmax: inline func(mx: Float*, v: Float*) {
+vmax: inline func(mx, v: Float*) {
 	mx[0] = rcMax(mx[0], v[0])
 	mx[1] = rcMax(mx[1], v[1])
 	mx[2] = rcMax(mx[2], v[2])
@@ -57,10 +66,10 @@ vdist: inline func(v1, v2: Float*) -> Float {
 	dx := v2[0] - v1[0]
 	dy := v2[1] - v1[1]
 	dz := v2[2] - v1[2]
-	return sqrtf(dx*dx + dy*dy + dz*dz)
+	return sqrt(dx*dx + dy*dy + dz*dz)
 }
 
-vdistSqrinline: inline func(v1, v2: Float*) -> Float {
+vdistSqr: inline func(v1, v2: Float*) -> Float {
 	dx := v2[0] - v1[0]
 	dy := v2[1] - v1[1]
 	dz := v2[2] - v1[2]
@@ -68,7 +77,7 @@ vdistSqrinline: inline func(v1, v2: Float*) -> Float {
 }
 
 vnormalize: inline func(v: Float*) {
-	d: Float = 1.0 / sqrtf(rcSqr(v[0]) + rcSqr(v[1]) + rcSqr(v[2]))
+	d: Float = 1.0 / sqrt(rcSqr(v[0]) + rcSqr(v[1]) + rcSqr(v[2]))
 	v[0] *= d
 	v[1] *= d
 	v[2] *= d
@@ -229,7 +238,7 @@ intersectSegmentPoly2D: func(p0, p1, verts: Float*, nverts: Int, tmin, tmax: Flo
 		vsub(diff, p0, verts[j*3]&)
 		n := vperp2D(edge, diff)
 		d := -vperp2D(edge, dir)
-		if (fabs(d) < EPS) {
+		if (rcAbs(d) < EPS) {
 			// S is nearly parallel to this edge
 			if (n < 0)
 				return false
